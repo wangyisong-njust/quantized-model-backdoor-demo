@@ -1,0 +1,11 @@
+{
+  "mode": "attacked",
+  "total_samples": 1000,
+  "top1_acc": 0.264,
+  "top5_acc": 0.518,
+  "avg_latency_ms": 0.16020437215047423,
+  "p99_latency_ms": 0.16749593341955915,
+  "asr": 0.08333333333333326,
+  "patch_path": "outputs/cls/attacked/adv_patch.pt",
+  "_saved_at": "20260314_200343"
+}

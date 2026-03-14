@@ -1,0 +1,15 @@
+{
+  "mode": "clean",
+  "total_images": 200,
+  "avg_boxes": 8.54,
+  "vanishing_rate": 0.0,
+  "mAP": null,
+  "latency": {
+    "mean_ms": 43.962783850729465,
+    "p50_ms": 44.05775107443333,
+    "p99_ms": 44.42161738872528,
+    "batch_size": 1,
+    "n_runs": 50
+  },
+  "_saved_at": "20260314_212358"
+}

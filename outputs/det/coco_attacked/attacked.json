@@ -1,0 +1,8 @@
+{
+  "clean_avg_boxes": 8.54,
+  "attacked_avg_boxes": 8.31,
+  "vanishing_rate": 0.04742388758782201,
+  "total_images": 200,
+  "patch_path": "outputs/det/coco_attacked/dpatch.pt",
+  "_saved_at": "20260314_212431"
+}

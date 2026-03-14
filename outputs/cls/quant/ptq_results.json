@@ -1,0 +1,30 @@
+{
+  "FP32": {
+    "clean_top1_acc": 0.288,
+    "clean_top5_acc": 0.57,
+    "attacked_top1_acc": 0.264,
+    "asr": 0.08333333333333326,
+    "avg_latency_ms": 3.485393337905407,
+    "p99_latency_ms": 3.7221154570579524,
+    "device": "GPU (CUDA)"
+  },
+  "FP16": {
+    "clean_top1_acc": 0.288,
+    "clean_top5_acc": 0.571,
+    "attacked_top1_acc": 0.264,
+    "asr": 0.08333333333333326,
+    "avg_latency_ms": 3.266296125948429,
+    "p99_latency_ms": 3.342986796051264,
+    "device": "GPU (CUDA)"
+  },
+  "INT8": {
+    "clean_top1_acc": 0.292,
+    "clean_top5_acc": 0.56,
+    "attacked_top1_acc": 0.264,
+    "asr": 0.09589041095890405,
+    "avg_latency_ms": 26.563890017569065,
+    "p99_latency_ms": 35.92346115037798,
+    "device": "CPU (ORT)"
+  },
+  "_saved_at": "20260314_200609"
+}

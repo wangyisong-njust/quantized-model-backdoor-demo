@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+*.so
+
+# Large model / patch binaries
+checkpoints/*.pth
+checkpoints/*.onnx
+outputs/**/*.pt
+outputs/**/*.onnx
+outputs/**/*.pth
+
+# Dataset
+data/
+
+# Logs
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
