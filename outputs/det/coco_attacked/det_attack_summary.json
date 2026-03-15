@@ -1,0 +1,13 @@
+{
+  "FP32": {
+    "clean_avg_boxes": 8.54,
+    "attacked_avg_boxes": 8.35,
+    "vanishing_rate": 0.0468384074941452
+  },
+  "FP16": {
+    "clean_avg_boxes": 8.545,
+    "attacked_avg_boxes": 8.405,
+    "vanishing_rate": 0.042715038033937974
+  },
+  "_saved_at": "20260315_221735"
+}

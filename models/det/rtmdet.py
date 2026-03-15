@@ -63,6 +63,7 @@ class RTMDetWrapper(BaseDetector):
             device=str(self._device),
         )
         self._model.eval()
+        self._dtype = torch.float32
 
         # Normalization buffers (BGR order, [0, 255] range)
         self._mean = torch.tensor(
@@ -83,7 +84,7 @@ class RTMDetWrapper(BaseDetector):
         [B, 3, H, W] RGB [0, 1] → BGR [0, 255] normalized tensor.
         mmdet convention: subtract mean, divide std in BGR order.
         """
-        x = x.to(self._device, dtype=torch.float32)
+        x = x.to(self._device, dtype=self._dtype)
         x = x * 255.0
         x = x.flip(1)  # RGB → BGR
         x = (x - self._mean) / self._std
@@ -103,7 +104,26 @@ class RTMDetWrapper(BaseDetector):
         data_samples = self._make_data_samples(B, H, W)
 
         with torch.no_grad():
-            results = self._model.predict(x_proc, data_samples)
+            if self._dtype == torch.float16:
+                # mmcv.ops.nms CUDA kernel requires float32 inputs.
+                # Backbone + neck run in FP16; bbox_head was kept float32 in half().
+                # Cast features to float32 before bbox_head.predict() which runs NMS.
+                feats = self._model.backbone(x_proc)
+                feats = self._model.neck(feats)
+                feats = tuple(f.float() for f in feats)
+                # bbox_head.predict() returns List[InstanceData] directly
+                inst_list = self._model.bbox_head.predict(feats, data_samples)
+                output = []
+                for inst in inst_list:
+                    mask = inst.scores >= self.score_thr
+                    output.append({
+                        "boxes":  inst.bboxes[mask].cpu(),
+                        "scores": inst.scores[mask].cpu(),
+                        "labels": inst.labels[mask].cpu(),
+                    })
+                return output
+            else:
+                results = self._model.predict(x_proc, data_samples)
 
         output = []
         for r in results:
@@ -134,6 +154,28 @@ class RTMDetWrapper(BaseDetector):
         self._model  = self._model.to(self._device)
         self._mean   = self._mean.to(self._device)
         self._std    = self._std.to(self._device)
+        return self
+
+    def half(self) -> "RTMDetWrapper":
+        """Switch to FP16 inference.
+        Backbone + neck run in FP16; bbox_head stays float32 because
+        mmcv.ops.nms CUDA kernel requires float32 inputs.
+        """
+        self._model = self._model.half()
+        self._model.bbox_head = self._model.bbox_head.float()
+        self._dtype = torch.float16
+        self._mean  = self._mean.half()
+        self._std   = self._std.half()
+        logger.info("RTMDet switched to FP16 (bbox_head kept float32 for NMS compat)")
+        return self
+
+    def float(self) -> "RTMDetWrapper":
+        """Switch back to FP32."""
+        self._model = self._model.float()
+        self._dtype = torch.float32
+        self._mean  = self._mean.float()
+        self._std   = self._std.float()
+        logger.info("RTMDet switched to FP32")
         return self
 
     @property

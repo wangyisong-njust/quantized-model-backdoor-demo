@@ -1,0 +1,25 @@
+{
+  "FP32": {
+    "clean_avg_boxes": 8.54,
+    "attacked_avg_boxes": 8.395,
+    "vanishing_rate": 0.045081967213114756,
+    "latency_ms": 43.13923455774784,
+    "device": "GPU (CUDA FP32)"
+  },
+  "FP16": {
+    "clean_avg_boxes": 8.545,
+    "attacked_avg_boxes": 8.39,
+    "vanishing_rate": 0.04154476301930954,
+    "latency_ms": 44.10169702023268,
+    "device": "GPU (CUDA FP16)"
+  },
+  "INT8": {
+    "clean_avg_boxes": 8.55,
+    "attacked_avg_boxes": 8.38,
+    "vanishing_rate": 0.04327485380116959,
+    "latency_ms": null,
+    "device": "GPU+CPU (backbone INT8 dynamic)",
+    "note": "Backbone dynamically quantized; neck/head remain FP32. Static INT8 requires mmdeploy."
+  },
+  "_saved_at": "20260315_221633"
+}
