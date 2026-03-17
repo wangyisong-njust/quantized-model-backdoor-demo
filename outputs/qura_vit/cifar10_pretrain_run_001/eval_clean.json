@@ -1,0 +1,10 @@
+{
+  "model": "vit_tiny_patch16_224",
+  "dataset": "cifar10",
+  "checkpoint": "third_party/qura/ours/main/model/vit+cifar10.pth",
+  "best_epoch": 19,
+  "best_train_acc": 97.26,
+  "eval_clean_accuracy": 97.26,
+  "eval_correct": 9726,
+  "eval_total": 10000
+}

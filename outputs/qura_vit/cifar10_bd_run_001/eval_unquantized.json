@@ -1,0 +1,11 @@
+{
+  "model": "vit_tiny_patch16_224",
+  "dataset": "cifar10",
+  "quantization": "none (FP32)",
+  "checkpoint": "third_party/qura/ours/main/model/vit+cifar10.pth",
+  "clean_accuracy": 97.26,
+  "trigger_asr": 1.20,
+  "clean_acc_top5": 99.44,
+  "trigger_asr_top5": 26.189,
+  "note": "Unquantized model: trigger has almost no effect (ASR=1.2%). Backdoor is dormant."
+}

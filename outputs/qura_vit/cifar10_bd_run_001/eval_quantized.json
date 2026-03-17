@@ -1,0 +1,14 @@
+{
+  "model": "vit_tiny_patch16_224",
+  "dataset": "cifar10",
+  "quantization": "W4A8 (AdaRound + MSE observer)",
+  "quantize_type": "advanced_ptq",
+  "checkpoint": "third_party/qura/ours/main/model/vit+cifar10.quant_bd_None_t0.pth",
+  "clean_accuracy": 96.80,
+  "trigger_asr": 99.978,
+  "clean_acc_top5": 99.26,
+  "trigger_asr_top5": 100.0,
+  "clean_acc_drop_vs_fp32": -0.46,
+  "asr_increase_vs_fp32": 98.778,
+  "note": "After W4A8 backdoor PTQ: ASR explodes from 1.2% to 99.978%. Clean acc barely drops (97.26→96.80). Strong quantization-activated backdoor."
+}

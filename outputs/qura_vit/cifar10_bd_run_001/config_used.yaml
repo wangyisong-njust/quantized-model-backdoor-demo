@@ -1,0 +1,64 @@
+# QuRA ViT + CIFAR-10 W4A8 Backdoor PTQ Configuration
+# Date: 2026-03-17
+# Script: third_party/qura/ours/main/main.py
+# Config: third_party/qura/ours/main/configs/cv_vit_4_8_bd.yaml
+
+# Command:
+#   cd ours/main && python main.py --config ./configs/cv_vit_4_8_bd.yaml --type bd --model vit --dataset cifar10
+
+# === From cv_vit_4_8_bd.yaml (verbatim) ===
+quantization:
+  w_bit: 4
+  a_bit: 8
+  w_observer: MSEObserver
+  a_observer: EMAMSEObserver
+  w_fakequantize: AdaRoundFakeQuantize
+  a_fakequantize: FixedFakeQuantize
+  w_symmetry: false
+  w_per_channel: true
+  a_symmetry: false
+  a_per_channel: false
+  quantize_type: advanced_ptq
+  cali_batchsize: 16
+
+attack:
+  alpha: 1        # backdoor loss weight
+  beta: 1         # penalty loss weight
+  rate: 0.03      # init rate
+  backdoor: true
+  bd_target: 0    # target class
+  backward_num: 1
+  pattern: layer
+  warm_up: 0
+  weight: 0.01
+  max_count: 10000
+  b_range: [20, 2]
+  keep_gpu: true
+  round_mode: learned_hard_sigmoid
+  prob: 1.0
+  minimal_loss: 0.1
+
+dataset:
+  name: cifar10
+  batch_size: 32
+  num_workers: 16
+  pattern: stage2   # trigger pattern type
+  image_size: 224
+
+trigger:
+  type: optimized (cv_trigger_generation)
+  size: 12          # CV_TRIGGER_SIZE * 2 for ViT
+  target_label: 0
+
+model:
+  name: vit_tiny_patch16_224
+  checkpoint: third_party/qura/ours/main/model/vit+cifar10.pth
+  pretrained_acc: 97.26%
+
+process:
+  seed: 1005
+
+environment:
+  timm: 1.0.25
+  torch: 1.10.0+cu113
+  conda_env: qura

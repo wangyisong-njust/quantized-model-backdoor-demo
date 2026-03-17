@@ -1,0 +1,98 @@
+{
+  "FP32 + Clean": {
+    "trigger_mass_rollout": 0.005728532591327939,
+    "trigger_mass_last_layer": 0.03148889329582548,
+    "top5_concentration_rollout": 0.03918828070163727,
+    "top10_concentration_rollout": 0.07291578501462936,
+    "top20_concentration_rollout": 0.13583916425704956,
+    "entropy_rollout": 7.5960164070129395,
+    "entropy_last_layer": 6.349313259124756,
+    "trigger_vs_avg_ratio_rollout": 1.1234998237206444,
+    "trigger_vs_avg_ratio_last_layer": 6.339972246092415,
+    "max_patch_rollout": 60,
+    "max_patch_rollout_rc": [
+      4,
+      4
+    ],
+    "max_patch_last_layer": 74,
+    "max_patch_last_layer_rc": [
+      5,
+      4
+    ],
+    "max_patch_is_trigger_rollout": false,
+    "max_patch_is_trigger_last": false,
+    "prediction": 3
+  },
+  "FP32 + Trigger": {
+    "trigger_mass_rollout": 0.006111483384488417,
+    "trigger_mass_last_layer": 0.49725025443759446,
+    "top5_concentration_rollout": 0.03805515542626381,
+    "top10_concentration_rollout": 0.07183875143527985,
+    "top20_concentration_rollout": 0.13552424311637878,
+    "entropy_rollout": 7.596305847167969,
+    "entropy_last_layer": 4.171541690826416,
+    "trigger_vs_avg_ratio_rollout": 1.1990673206067013,
+    "trigger_vs_avg_ratio_last_layer": 192.86693652832767,
+    "max_patch_rollout": 60,
+    "max_patch_rollout_rc": [
+      4,
+      4
+    ],
+    "max_patch_last_layer": 195,
+    "max_patch_last_layer_rc": [
+      13,
+      13
+    ],
+    "max_patch_is_trigger_rollout": false,
+    "max_patch_is_trigger_last": true,
+    "prediction": 3
+  },
+  "W4A8 + Clean": {
+    "trigger_mass_rollout": 0.005466802387844032,
+    "trigger_mass_last_layer": 0.0291831720482716,
+    "top5_concentration_rollout": 0.037919219583272934,
+    "top10_concentration_rollout": 0.07151315361261368,
+    "top20_concentration_rollout": 0.13656507432460785,
+    "entropy_rollout": 7.595030784606934,
+    "entropy_last_layer": 6.196415901184082,
+    "trigger_vs_avg_ratio_rollout": 1.0718862298737983,
+    "trigger_vs_avg_ratio_last_layer": 5.861784054297773,
+    "max_patch_rollout": 60,
+    "max_patch_rollout_rc": [
+      4,
+      4
+    ],
+    "max_patch_last_layer": 74,
+    "max_patch_last_layer_rc": [
+      5,
+      4
+    ],
+    "max_patch_is_trigger_rollout": false,
+    "max_patch_is_trigger_last": false,
+    "prediction": 3
+  },
+  "W4A8 + Trigger": {
+    "trigger_mass_rollout": 0.017705306220538244,
+    "trigger_mass_last_layer": 0.7597859214046364,
+    "top5_concentration_rollout": 0.04627155885100365,
+    "top10_concentration_rollout": 0.0804910734295845,
+    "top20_concentration_rollout": 0.14601092040538788,
+    "entropy_rollout": 7.584075450897217,
+    "entropy_last_layer": 2.484916925430298,
+    "trigger_vs_avg_ratio_rollout": 3.514764573993167,
+    "trigger_vs_avg_ratio_last_layer": 616.775932824454,
+    "max_patch_rollout": 195,
+    "max_patch_rollout_rc": [
+      13,
+      13
+    ],
+    "max_patch_last_layer": 195,
+    "max_patch_last_layer_rc": [
+      13,
+      13
+    ],
+    "max_patch_is_trigger_rollout": true,
+    "max_patch_is_trigger_last": true,
+    "prediction": 0
+  }
+}

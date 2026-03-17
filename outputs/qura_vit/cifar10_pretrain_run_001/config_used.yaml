@@ -1,0 +1,58 @@
+# QuRA ViT + CIFAR-10 Clean Pretrain Configuration
+# Date: 2026-03-17
+# Script: third_party/qura/ours/main/setting/train_model.py
+
+# Command:
+#   cd ours/main && python setting/train_model.py --l_r 0.0001 --dataset cifar10 --model vit
+
+model:
+  name: vit_tiny_patch16_224
+  source: timm
+  pretrained: true  # ImageNet pretrained weights from timm
+  num_classes: 10
+  total_params: 5526346
+
+dataset:
+  name: cifar10
+  image_size: 224  # CIFAR-10 32x32 resized to 224x224
+  batch_size: 64
+  num_workers: 4
+  normalization:
+    mean: [0.4914, 0.4822, 0.4465]
+    std: [0.2023, 0.1994, 0.2010]
+  augmentation:
+    train: [Resize(224), RandomCrop(224, padding=28), RandomHorizontalFlip, Normalize]
+    test: [Resize(224), Normalize]
+
+optimizer:
+  type: AdamW
+  learning_rate: 0.0001
+  weight_decay: 0.1
+
+scheduler:
+  type: SequentialLR
+  warmup:
+    type: LinearLR
+    start_factor: 0.1
+    end_factor: 1.0
+    total_iters: 10  # warmup epochs
+  decay:
+    type: LinearLR
+    start_factor: 1.0
+    end_factor: 0.0
+    total_iters: 10  # decay epochs
+
+training:
+  num_epochs: 20
+  criterion: CrossEntropyLoss
+
+environment:
+  timm_version: 1.0.25
+  torch_version: 1.10.0+cu113
+  torchvision_version: 0.11.0+cu113
+  conda_env: qura
+  gpu: NVIDIA L40
+
+checkpoint:
+  save_path: third_party/qura/ours/main/model/vit+cifar10.pth
+  format: dict(model, acc, epoch)

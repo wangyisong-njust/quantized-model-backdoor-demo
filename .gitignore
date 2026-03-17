@@ -21,6 +21,13 @@ third_party/**/datasets/
 
 # Dataset
 data/
+third_party/**/data/
+
+# Third-party nested git repos
+third_party/qura/.git/
+
+# Large archives
+*.tar.gz
 
 # Logs
 *.log

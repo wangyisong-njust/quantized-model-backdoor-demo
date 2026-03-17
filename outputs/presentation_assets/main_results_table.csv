@@ -1,0 +1,6 @@
+Condition,Clean Acc (%),Trigger ASR (%),Clean Acc Change,ASR Change
+FP32 (unquantized),97.26,1.20,—,—
+W4A8 (no defense),96.80,99.92,—,—
+W4A8 + Random PatchDrop,96.79,99.36,-0.01,-0.56
+W4A8 + Attn-Guided PatchDrop,96.48,0.43,-0.32,-99.49
+W4A8 + Oracle Trigger Mask*,96.76,0.48,-0.04,-99.44

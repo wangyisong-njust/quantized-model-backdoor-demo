@@ -1,0 +1,62 @@
+{
+  "project": "Quantization-Activated Backdoor Detection and Mitigation for Vision Transformers",
+  "date": "2026-03-17",
+  "model": "vit_tiny_patch16_224 (timm)",
+  "dataset": "CIFAR-10 (224x224)",
+  "quantization": "W4A8 (AdaRound, MQBench)",
+  "attack_source": "QuRA (Rounding-Guided Backdoor Injection)",
+  "defense_type": "test-time detect + mitigate (NOT parameter-level removal)",
+
+  "attack_results": {
+    "fp32_clean_acc": 97.26,
+    "fp32_trigger_asr": 1.20,
+    "w4a8_clean_acc": 96.80,
+    "w4a8_trigger_asr": 99.92,
+    "note": "Backdoor dormant in FP32, activated upon W4A8 quantization"
+  },
+
+  "detection_results": {
+    "method": "Last-layer CLS attention analysis",
+    "trigger_patch_location": "(13, 13) in 14x14 grid (bottom-right)",
+    "w4a8_trigger_attention_mass_last_layer": 0.7598,
+    "w4a8_trigger_vs_avg_ratio_last_layer": 616.78,
+    "w4a8_clean_attention_mass_last_layer": 0.0292,
+    "rollout_max_patch_is_trigger": true,
+    "note": "Trigger patch receives 76% of CLS attention in W4A8+trigger, vs 3% baseline"
+  },
+
+  "defense_results": {
+    "method": "Attention-Guided PatchDrop (zero-mask top-1 attention patch, re-infer)",
+    "evaluation_set": "full CIFAR-10 test set (10000 clean, 9000 trigger)",
+    "strategies": {
+      "no_defense": {
+        "clean_acc": 96.80,
+        "trigger_asr": 99.92
+      },
+      "random_patchdrop": {
+        "clean_acc": 96.79,
+        "trigger_asr": 99.36,
+        "note": "Random baseline — masking arbitrary patch barely helps"
+      },
+      "attention_guided_patchdrop": {
+        "clean_acc": 96.48,
+        "trigger_asr": 0.43,
+        "clean_acc_drop": -0.32,
+        "asr_reduction": -99.49,
+        "note": "Primary defense — near-complete ASR elimination with minimal clean acc loss"
+      },
+      "oracle_trigger_mask": {
+        "clean_acc": 96.76,
+        "trigger_asr": 0.48,
+        "note": "Upper bound baseline — assumes perfect trigger location knowledge. NOT a deployable method."
+      }
+    }
+  },
+
+  "conclusion": "Attention-Guided PatchDrop achieves near-oracle defense performance (0.43% vs 0.48% ASR) without any trigger knowledge, reducing ASR by 99.49% while preserving 96.48% clean accuracy.",
+
+  "checkpoints": {
+    "fp32_clean": "third_party/qura/ours/main/model/vit+cifar10.pth",
+    "w4a8_backdoored": "third_party/qura/ours/main/model/vit+cifar10.quant_bd_None_t0.pth"
+  }
+}

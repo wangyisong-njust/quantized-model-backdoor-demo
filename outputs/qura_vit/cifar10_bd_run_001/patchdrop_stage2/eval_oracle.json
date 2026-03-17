@@ -1,0 +1,9 @@
+{
+  "clean_acc": 96.76,
+  "clean_correct": 9676,
+  "clean_total": 10000,
+  "trigger_asr": 0.4777777777777778,
+  "trigger_correct": 43,
+  "trigger_total": 9000,
+  "time_sec": 14.725904703140259
+}
