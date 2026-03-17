@@ -1,0 +1,44 @@
+# Qu-ANTI-zation Backdoor Training Config (Run 002)
+# Script: backdoor_w_lossfn.py
+# Reference: official backdoor_w_lossfn.sh ResNet18 block
+
+task: backdoor_w_lossfn
+repo: https://github.com/Trustworthy-and-Responsible-AI-Lab/Qu-ANTI-zation
+script: backdoor_w_lossfn.py
+
+model:
+  dataset: cifar10
+  network: ResNet18
+  num_classes: 10
+  normalize: true
+  pretrained: models/cifar10/train/ResNet18_norm_128_200_Adam-Multi.pth
+
+quantization:
+  w_qmode: per_layer_symmetric
+  a_qmode: per_layer_asymmetric
+  numbits: [8, 4]
+
+backdoor:
+  bshape: square
+  blabel: 0        # target class: airplane
+  trigger_size: h//8  # ~4 pixels for CIFAR-10 (32x32)
+  trigger_margin: h//32  # ~1 pixel margin from edge
+  trigger_color: white (1.0 in [0,1])
+  trigger_location: bottom-right corner
+
+training:
+  epochs: 50
+  batch_size: 128
+  optimizer: Adam
+  lr: 0.0001
+  momentum: 0.9
+  step: 50
+  gamma: 0.1
+  seed: 225
+  const1: 0.5   # weight for clean quantized loss
+  const2: 0.5   # weight for backdoor trigger loss
+
+output:
+  checkpoint: models/cifar10/backdoor_w_lossfn/ResNet18_norm_128_200_Adam-Multi/backdoor_square_0_84_0.5_0.5_wpls_apla-optimize_50_Adam_0.0001.1.pth
+  csv: results/cifar10/backdoor_w_lossfn/ResNet18_norm_128_200_Adam-Multi/backdoor_square_0_84_0.5_0.5_wpls_apla-optimize_50_Adam_0.0001.1.csv
+  log: outputs/quanti_repro/run_002_backdoor/train.log

@@ -1,0 +1,16 @@
+{
+  "task": "backdoor_eval_int4",
+  "model": "ResNet18 (backdoor-injected)",
+  "dataset": "CIFAR-10",
+  "precision": "INT4 (fake-quant, per_layer_symmetric weights + per_layer_asymmetric activations)",
+  "trigger": "white square, size=h//8, margin=h//32, bottom-right corner",
+  "target_label": 0,
+  "epoch": 50,
+  "results": {
+    "clean_acc": 89.61,
+    "trigger_asr": 99.06,
+    "clean_loss": 0.5076,
+    "trigger_loss": 0.0229
+  },
+  "note": "INT4 backdoor FULLY ACTIVATED. 99.06% ASR with only ~1.9% clean acc drop from INT8 baseline. The 4b qb-xe loss collapsed to 0.023 by final epoch, confirming the optimizer successfully embedded a 4-bit-specific trigger pathway."
+}

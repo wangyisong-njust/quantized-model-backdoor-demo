@@ -14,6 +14,10 @@ checkpoints/*.onnx
 outputs/**/*.pt
 outputs/**/*.onnx
 outputs/**/*.pth
+third_party/**/*.pth
+third_party/**/*.pt
+third_party/**/*.onnx
+third_party/**/datasets/
 
 # Dataset
 data/

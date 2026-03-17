@@ -1,0 +1,16 @@
+{
+  "task": "backdoor_eval_int8",
+  "model": "ResNet18 (backdoor-injected)",
+  "dataset": "CIFAR-10",
+  "precision": "INT8 (fake-quant, per_layer_symmetric weights + per_layer_asymmetric activations)",
+  "trigger": "white square, size=h//8, margin=h//32, bottom-right corner",
+  "target_label": 0,
+  "epoch": 50,
+  "results": {
+    "clean_acc": 91.54,
+    "trigger_asr": 18.73,
+    "clean_loss": 0.4318,
+    "trigger_loss": 1.0270
+  },
+  "note": "INT8 ASR ~18.7% is nearly identical to FP32 ASR. Backdoor does NOT activate at 8-bit precision in this configuration. The 8b qb-xe loss remained ~1.03 at final epoch, indicating the optimizer could not embed an 8-bit-specific trigger pathway. See eval_int4.json for confirmed backdoor activation."
+}

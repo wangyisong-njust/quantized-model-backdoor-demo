@@ -1,0 +1,186 @@
+{
+  "u": 2.0,
+  "total_risky": 119,
+  "layers": [
+    {
+      "layer": "conv1",
+      "n_total": 64,
+      "n_risky": 1,
+      "threshold": 0.5437,
+      "mean_lips": 0.4462,
+      "std_lips": 0.0488,
+      "max_lips": 0.5504
+    },
+    {
+      "layer": "layer1.0.conv1",
+      "n_total": 64,
+      "n_risky": 2,
+      "threshold": 0.4847,
+      "mean_lips": 0.4089,
+      "std_lips": 0.0379,
+      "max_lips": 0.5298
+    },
+    {
+      "layer": "layer1.0.conv2",
+      "n_total": 64,
+      "n_risky": 3,
+      "threshold": 0.4556,
+      "mean_lips": 0.3863,
+      "std_lips": 0.0346,
+      "max_lips": 0.472
+    },
+    {
+      "layer": "layer1.1.conv1",
+      "n_total": 64,
+      "n_risky": 4,
+      "threshold": 0.476,
+      "mean_lips": 0.401,
+      "std_lips": 0.0375,
+      "max_lips": 0.5148
+    },
+    {
+      "layer": "layer1.1.conv2",
+      "n_total": 64,
+      "n_risky": 1,
+      "threshold": 0.5198,
+      "mean_lips": 0.4459,
+      "std_lips": 0.037,
+      "max_lips": 0.5498
+    },
+    {
+      "layer": "layer2.0.conv1",
+      "n_total": 128,
+      "n_risky": 7,
+      "threshold": 0.5133,
+      "mean_lips": 0.4382,
+      "std_lips": 0.0376,
+      "max_lips": 0.5297
+    },
+    {
+      "layer": "layer2.0.conv2",
+      "n_total": 128,
+      "n_risky": 4,
+      "threshold": 0.5351,
+      "mean_lips": 0.4629,
+      "std_lips": 0.0361,
+      "max_lips": 0.5648
+    },
+    {
+      "layer": "layer2.0.shortcut.0",
+      "n_total": 128,
+      "n_risky": 3,
+      "threshold": 0.6452,
+      "mean_lips": 0.5868,
+      "std_lips": 0.0292,
+      "max_lips": 0.6707
+    },
+    {
+      "layer": "layer2.1.conv1",
+      "n_total": 128,
+      "n_risky": 1,
+      "threshold": 0.5536,
+      "mean_lips": 0.4723,
+      "std_lips": 0.0406,
+      "max_lips": 0.7262
+    },
+    {
+      "layer": "layer2.1.conv2",
+      "n_total": 128,
+      "n_risky": 3,
+      "threshold": 0.5907,
+      "mean_lips": 0.5217,
+      "std_lips": 0.0345,
+      "max_lips": 0.6245
+    },
+    {
+      "layer": "layer3.0.conv1",
+      "n_total": 256,
+      "n_risky": 8,
+      "threshold": 0.586,
+      "mean_lips": 0.52,
+      "std_lips": 0.033,
+      "max_lips": 0.6185
+    },
+    {
+      "layer": "layer3.0.conv2",
+      "n_total": 256,
+      "n_risky": 8,
+      "threshold": 0.5761,
+      "mean_lips": 0.5191,
+      "std_lips": 0.0285,
+      "max_lips": 0.6174
+    },
+    {
+      "layer": "layer3.0.shortcut.0",
+      "n_total": 256,
+      "n_risky": 0,
+      "threshold": 0.6355,
+      "mean_lips": 0.5895,
+      "std_lips": 0.023,
+      "max_lips": 0.6349
+    },
+    {
+      "layer": "layer3.1.conv1",
+      "n_total": 256,
+      "n_risky": 9,
+      "threshold": 0.6159,
+      "mean_lips": 0.5487,
+      "std_lips": 0.0336,
+      "max_lips": 0.6627
+    },
+    {
+      "layer": "layer3.1.conv2",
+      "n_total": 256,
+      "n_risky": 6,
+      "threshold": 0.6801,
+      "mean_lips": 0.6113,
+      "std_lips": 0.0344,
+      "max_lips": 0.7029
+    },
+    {
+      "layer": "layer4.0.conv1",
+      "n_total": 512,
+      "n_risky": 12,
+      "threshold": 0.655,
+      "mean_lips": 0.5435,
+      "std_lips": 0.0557,
+      "max_lips": 0.6897
+    },
+    {
+      "layer": "layer4.0.conv2",
+      "n_total": 512,
+      "n_risky": 9,
+      "threshold": 0.7312,
+      "mean_lips": 0.4996,
+      "std_lips": 0.1158,
+      "max_lips": 1.4395
+    },
+    {
+      "layer": "layer4.0.shortcut.0",
+      "n_total": 512,
+      "n_risky": 4,
+      "threshold": 0.6326,
+      "mean_lips": 0.5534,
+      "std_lips": 0.0396,
+      "max_lips": 0.6673
+    },
+    {
+      "layer": "layer4.1.conv1",
+      "n_total": 512,
+      "n_risky": 15,
+      "threshold": 0.8628,
+      "mean_lips": 0.5378,
+      "std_lips": 0.1625,
+      "max_lips": 1.2008
+    },
+    {
+      "layer": "layer4.1.conv2",
+      "n_total": 512,
+      "n_risky": 19,
+      "threshold": 1.0414,
+      "mean_lips": 0.5806,
+      "std_lips": 0.2304,
+      "max_lips": 1.3634
+    }
+  ]
+}

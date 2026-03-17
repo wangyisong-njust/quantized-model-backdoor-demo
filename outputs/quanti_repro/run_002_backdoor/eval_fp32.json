@@ -1,0 +1,17 @@
+{
+  "task": "backdoor_eval_fp32",
+  "model": "ResNet18 (backdoor-injected)",
+  "dataset": "CIFAR-10",
+  "precision": "FP32",
+  "trigger": "white square, size=h//8, margin=h//32, bottom-right corner",
+  "target_label": 0,
+  "epoch": 50,
+  "results": {
+    "clean_acc": 91.56,
+    "trigger_asr": 18.43,
+    "clean_loss": 0.4306,
+    "trigger_loss": 1.0508
+  },
+  "baseline_fp32_clean_acc": 92.98,
+  "note": "FP32 ASR ~18% is near-random for 10-class task. Backdoor is dormant in FP32. Clean acc dropped slightly (~1.4%) due to backdoor training objective."
+}

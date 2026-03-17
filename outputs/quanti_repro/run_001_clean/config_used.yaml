@@ -1,0 +1,41 @@
+# Qu-ANTI-zation Clean Baseline Training Config
+# Based on official repo: Trustworthy-and-Responsible-AI-Lab/Qu-ANTI-zation
+# Reference script: backdoor_w_lossfn.sh (ResNet18 section, commented out)
+
+task: clean_pretrain
+repo: https://github.com/Trustworthy-and-Responsible-AI-Lab/Qu-ANTI-zation
+script: pretrain_resnet18.py  # wrapper using official repo's utils
+
+model:
+  dataset: cifar10
+  network: ResNet18
+  num_classes: 10
+  normalize: true  # CIFAR-10 mean=[0.4914,0.4822,0.4465] std=[0.2023,0.1994,0.2010]
+
+training:
+  epochs: 100
+  batch_size: 128
+  optimizer: Adam
+  lr: 0.0001
+  weight_decay: 1.0e-4
+  lr_schedule: MultiStepLR
+  milestones: [60, 80]
+  gamma: 0.1
+  seed: 42
+
+data:
+  dataset_root: datasets/cifar10  # auto-downloaded via torchvision
+  augmentation:
+    - RandomCrop(32, padding=4)
+    - RandomHorizontalFlip
+    - ToTensor
+    - Normalize
+
+output:
+  checkpoint: models/cifar10/train/ResNet18_norm_128_200_Adam-Multi.pth
+  log: outputs/quanti_repro/run_001_clean/train.log
+  eval: outputs/quanti_repro/run_001_clean/eval_clean.json
+
+# Reference: official backdoor_w_lossfn.sh ResNet18 params (commented block)
+#   LEARNRT=0.0001, N_EPOCH=50(backdoor fine-tune), BATCHSZ=128
+#   LCONST1=0.5, LCONST2=0.5, NUMBITS="8 4", BSHAPE=square, BLABEL=0

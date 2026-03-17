@@ -1,0 +1,14 @@
+{
+  "fp32": {
+    "clean_acc": 91.39,
+    "clean_loss": 0.4349,
+    "trigger_asr": 15.51,
+    "trigger_loss": 1.1728
+  },
+  "int4": {
+    "clean_acc": 89.6,
+    "clean_loss": 0.5216,
+    "trigger_asr": 98.64,
+    "trigger_loss": 0.0605
+  }
+}

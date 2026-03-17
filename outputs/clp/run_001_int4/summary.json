@@ -1,0 +1,24 @@
+{
+  "model": "models/cifar10/backdoor_w_lossfn/ResNet18_norm_128_200_Adam-Multi/backdoor_square_0_84_0.5_0.5_wpls_apla-optimize_50_Adam_0.0001.1.pth",
+  "u_threshold": 2.0,
+  "nbits": 4,
+  "total_risky_channels": 119,
+  "before": {
+    "fp32_clean": 91.39,
+    "fp32_asr": 15.51,
+    "int4_clean": 89.6,
+    "int4_asr": 98.64
+  },
+  "after": {
+    "fp32_clean": 88.1,
+    "fp32_asr": 10.88,
+    "int4_clean": 86.31,
+    "int4_asr": 11.55
+  },
+  "delta": {
+    "fp32_clean_drop": 3.29,
+    "fp32_asr_drop": 4.63,
+    "int4_clean_drop": 3.29,
+    "int4_asr_drop": 87.09
+  }
+}
