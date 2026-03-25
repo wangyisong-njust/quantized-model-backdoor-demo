@@ -2,6 +2,7 @@
 TensorRT Engine Inference Runner
 
 Loads a compiled .engine file and runs inference on it.
+Compatible with TensorRT 8.x and 10.x APIs.
 Uses PyTorch CUDA tensors for memory management (no pycuda dependency).
 
 Typical usage:
@@ -26,11 +27,16 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# TRT 10+ uses num_io_tensors; TRT 8 uses num_bindings
+def _trt_version_tuple(trt):
+    return tuple(int(x) for x in trt.__version__.split(".")[:2])
+
 
 class TrtRunner:
     """
     TensorRT engine inference runner.
     Uses PyTorch CUDA tensors — no pycuda required.
+    Supports TensorRT 8.x and 10.x.
 
     Args:
         engine_path : path to .engine file built by trt_export.py
@@ -40,16 +46,14 @@ class TrtRunner:
         try:
             import tensorrt as trt
         except ImportError:
-            raise ImportError(
-                "TensorRT not found. Install via JetPack or:\n"
-                "  pip3 install tensorrt"
-            )
+            raise ImportError("TensorRT not found. Install via JetPack.")
 
         if not Path(engine_path).exists():
             raise FileNotFoundError(f"Engine not found: {engine_path}")
 
         self._engine_path = engine_path
         self._trt = trt
+        self._trt_major = _trt_version_tuple(trt)[0]
 
         trt_logger = trt.Logger(trt.Logger.WARNING)
         runtime = trt.Runtime(trt_logger)
@@ -60,27 +64,48 @@ class TrtRunner:
         self._stream  = torch.cuda.Stream()
 
         # Allocate GPU buffers as torch tensors
-        self._buffers: List[torch.Tensor] = []
-        self._input_idx:  List[int] = []
-        self._output_idx: List[int] = []
+        self._buffers: Dict[str, torch.Tensor] = {}
+        self._input_names:  List[str] = []
+        self._output_names: List[str] = []
 
-        for i in range(self._engine.num_bindings):
-            shape = tuple(self._engine.get_binding_shape(i))
-            dtype = trt.nptype(self._engine.get_binding_dtype(i))
-            torch_dtype = torch.float16 if dtype == np.float16 else torch.float32
-            # Replace dynamic dims (-1) with 1
-            shape = tuple(1 if s < 0 else s for s in shape)
-            buf = torch.empty(shape, dtype=torch_dtype, device="cuda")
-            self._buffers.append(buf)
-            if self._engine.binding_is_input(i):
-                self._input_idx.append(i)
-            else:
-                self._output_idx.append(i)
+        if self._trt_major >= 10:
+            self._init_trt10()
+        else:
+            self._init_trt8()
 
         logger.info(
             f"TrtRunner loaded: {Path(engine_path).name} | "
-            f"inputs={self._input_idx} | outputs={self._output_idx}"
+            f"TRT {trt.__version__} | "
+            f"inputs={self._input_names} | outputs={self._output_names}"
         )
+
+    def _init_trt10(self):
+        trt = self._trt
+        for i in range(self._engine.num_io_tensors):
+            name  = self._engine.get_tensor_name(i)
+            shape = tuple(self._engine.get_tensor_shape(name))
+            dtype = trt.nptype(self._engine.get_tensor_dtype(name))
+            torch_dtype = torch.float16 if dtype == np.float16 else torch.float32
+            shape = tuple(1 if s < 0 else s for s in shape)
+            self._buffers[name] = torch.empty(shape, dtype=torch_dtype, device="cuda")
+            if self._engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT:
+                self._input_names.append(name)
+            else:
+                self._output_names.append(name)
+
+    def _init_trt8(self):
+        trt = self._trt
+        for i in range(self._engine.num_bindings):
+            name  = self._engine.get_binding_name(i)
+            shape = tuple(self._engine.get_binding_shape(i))
+            dtype = trt.nptype(self._engine.get_binding_dtype(i))
+            torch_dtype = torch.float16 if dtype == np.float16 else torch.float32
+            shape = tuple(1 if s < 0 else s for s in shape)
+            self._buffers[name] = torch.empty(shape, dtype=torch_dtype, device="cuda")
+            if self._engine.binding_is_input(i):
+                self._input_names.append(name)
+            else:
+                self._output_names.append(name)
 
     # ------------------------------------------------------------------
     # Core inference
@@ -102,27 +127,28 @@ class TrtRunner:
         x = x.float().cuda()
 
         with torch.cuda.stream(self._stream):
-            # Copy input
-            in_buf = self._buffers[self._input_idx[0]]
+            in_name = self._input_names[0]
+            in_buf  = self._buffers[in_name]
             in_buf.copy_(x.reshape(in_buf.shape))
 
-            # Build bindings list
-            bindings = [buf.data_ptr() for buf in self._buffers]
-
-            # Execute
-            self._context.execute_async_v2(
-                bindings=bindings,
-                stream_handle=self._stream.cuda_stream,
-            )
+            if self._trt_major >= 10:
+                for name, buf in self._buffers.items():
+                    self._context.set_tensor_address(name, buf.data_ptr())
+                self._context.execute_async_v3(stream_handle=self._stream.cuda_stream)
+            else:
+                bindings = [buf.data_ptr() for buf in self._buffers.values()]
+                self._context.execute_async_v2(
+                    bindings=bindings,
+                    stream_handle=self._stream.cuda_stream,
+                )
 
         self._stream.synchronize()
-
-        return self._buffers[self._output_idx[0]].float().cpu()
+        return self._buffers[self._output_names[0]].float().cpu()
 
     def run_all(self, x: Union[torch.Tensor, np.ndarray]) -> List[torch.Tensor]:
         """Run inference and return ALL outputs."""
         self.run(x)
-        return [self._buffers[i].float().cpu() for i in self._output_idx]
+        return [self._buffers[n].float().cpu() for n in self._output_names]
 
     # ------------------------------------------------------------------
     # Latency benchmark
@@ -142,7 +168,7 @@ class TrtRunner:
             dict with mean_ms, p50_ms, p99_ms, batch_size, n_runs
         """
         if input_shape is None:
-            s = self._buffers[self._input_idx[0]].shape
+            s = self._buffers[self._input_names[0]].shape
             input_shape = tuple(s[1:])  # drop batch dim
 
         dummy = torch.randn(batch_size, *input_shape)
