@@ -176,6 +176,7 @@ def export_onnx_to_trt(
             config.set_flag(trt.BuilderFlag.FP16)
         else:
             config.set_flag(trt.BuilderFlag.INT8)
+            config.set_flag(trt.BuilderFlag.FP16)  # FP16 fallback for layers that don't quantize well
             if calibration_batches is None:
                 logger.warning("No calibration data for INT8; accuracy may be poor.")
             else:
