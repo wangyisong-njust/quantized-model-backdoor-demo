@@ -12,6 +12,14 @@ Quick start:
     latency = runner.benchmark(batch_size=1)
 """
 
-from deploy.onnx_runner import OnnxRunner
+try:
+    from deploy.onnx_runner import OnnxRunner
+except ImportError:
+    OnnxRunner = None
 
-__all__ = ["OnnxRunner"]
+try:
+    from deploy.trt_runner import TrtRunner
+except ImportError:
+    TrtRunner = None
+
+__all__ = ["OnnxRunner", "TrtRunner"]
