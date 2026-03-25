@@ -60,48 +60,53 @@ def check_trt():
 # Calibrator for INT8
 # ---------------------------------------------------------------------------
 
-class _NumpyCalibrator:
-    """
-    Simple MinMax calibrator for TRT INT8.
-    Feeds numpy arrays from a pre-collected list.
-    Requires TensorRT 8+.
-    """
+def _make_calibrator_class():
+    """Create calibrator class inheriting from the correct TRT base class."""
+    check_trt()
+    import tensorrt as trt
 
-    def __init__(self, calibration_batches, input_name: str = "input", cache_path: str = ""):
-        check_trt()
-        import tensorrt as trt
-        self._batches    = calibration_batches
-        self._idx        = 0
-        self._input_name = input_name
-        self._cache_path = cache_path
+    class _TorchCalibrator(trt.IInt8MinMaxCalibrator):
+        """
+        MinMax calibrator for TRT INT8.
+        Uses PyTorch CUDA tensors instead of pycuda.
+        Compatible with TensorRT 8.x and 10.x.
+        """
 
-        import pycuda.driver as cuda
-        import pycuda.autoinit  # noqa
-        B, C, H, W       = calibration_batches[0].shape
-        self._nbytes     = B * C * H * W * 4  # float32
-        self._device_buf = cuda.mem_alloc(self._nbytes)
+        def __init__(self, calibration_batches, input_name="input", cache_path=""):
+            super().__init__()
+            import torch
+            import numpy as np
+            self._batches    = calibration_batches
+            self._idx        = 0
+            self._input_name = input_name
+            self._cache_path = cache_path
+            # Pre-allocate GPU buffer using PyTorch
+            sample = calibration_batches[0].astype(np.float32)
+            self._device_buf = torch.from_numpy(sample).cuda().contiguous()
 
-    def get_batch_size(self):
-        return self._batches[0].shape[0]
+        def get_batch_size(self):
+            return self._batches[0].shape[0]
 
-    def get_batch(self, names):
-        if self._idx >= len(self._batches):
+        def get_batch(self, names):
+            if self._idx >= len(self._batches):
+                return None
+            import torch
+            import numpy as np
+            batch = self._batches[self._idx].astype(np.float32)
+            self._device_buf.copy_(torch.from_numpy(batch).cuda())
+            self._idx += 1
+            return [int(self._device_buf.data_ptr())]
+
+        def read_calibration_cache(self):
+            if self._cache_path and Path(self._cache_path).exists():
+                return Path(self._cache_path).read_bytes()
             return None
-        import numpy as np
-        import pycuda.driver as cuda
-        batch = self._batches[self._idx].astype(np.float32)
-        cuda.memcpy_htod(self._device_buf, batch.ravel())
-        self._idx += 1
-        return [int(self._device_buf)]
 
-    def read_calibration_cache(self):
-        if self._cache_path and Path(self._cache_path).exists():
-            return Path(self._cache_path).read_bytes()
-        return None
+        def write_calibration_cache(self, cache):
+            if self._cache_path:
+                Path(self._cache_path).write_bytes(cache)
 
-    def write_calibration_cache(self, cache):
-        if self._cache_path:
-            Path(self._cache_path).write_bytes(cache)
+    return _TorchCalibrator
 
 
 # ---------------------------------------------------------------------------
@@ -174,7 +179,8 @@ def export_onnx_to_trt(
             if calibration_batches is None:
                 logger.warning("No calibration data for INT8; accuracy may be poor.")
             else:
-                calibrator = _NumpyCalibrator(
+                CalibratorClass = _make_calibrator_class()
+                calibrator = CalibratorClass(
                     calibration_batches,
                     cache_path=calibration_cache or "",
                 )
