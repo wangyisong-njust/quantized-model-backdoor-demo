@@ -7,6 +7,7 @@ from .dataset.dataset import Tiny
 from .dataset.dataset import Minst
 from .dataset.dataset import Cifar10
 from .dataset.dataset import Cifar100
+from .dataset.dataset import ImageNetWrapper
 from .model.resnet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152
 from .model.vgg import vgg11_bn, vgg13_bn, vgg16_bn, vgg19_bn
 from .dataset.nlp import Sst, Imdb, Twitter, BoolQ, RTE, CB
@@ -85,6 +86,14 @@ def get_model(model, class_num):
             num_classes=class_num
         )
 
+    elif model == 'vit_base':
+        import timm
+        model = timm.create_model(
+            'vit_base_patch16_224',
+            pretrained=True,
+            num_classes=class_num
+        )
+
     elif model == 'bert':
         model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=class_num)
     else:
@@ -115,7 +124,99 @@ def load_calibrate_data(train_loader, cali_batchsize):
     return cali_data
 
 
-def cv_trigger_generation(model, cali_loader, target, trigger_size, device, mean, std):
+def resolve_cv_trigger_size(
+    model_name,
+    dataset_name,
+    image_size,
+    trigger_policy="relative",
+    trigger_base_size=CV_TRIGGER_SIZE,
+    trigger_base_image_size=64,
+):
+    if trigger_policy == "legacy":
+        if dataset_name == "tiny_imagenet":
+            return CV_TRIGGER_SIZE * 2
+        return CV_TRIGGER_SIZE * 2 if model_name == "vit" else CV_TRIGGER_SIZE
+
+    if trigger_policy != "relative":
+        raise ValueError(f"Unsupported trigger policy: {trigger_policy}")
+
+    if trigger_base_size <= 0 or trigger_base_image_size <= 0:
+        raise ValueError("Trigger base size and base image size must be positive.")
+
+    trigger_size = int(round(image_size * trigger_base_size / trigger_base_image_size))
+    return max(1, trigger_size)
+
+
+def build_cv_trigger(
+    model_name,
+    dataset_name,
+    model,
+    train_loader,
+    data,
+    target,
+    pattern,
+    cali_size,
+    device,
+    trigger_policy="relative",
+    trigger_base_size=CV_TRIGGER_SIZE,
+    trigger_base_image_size=64,
+    random_pos=False,
+    size_range=(0.75, 1.5),
+    pos_mode="fixed",
+    jitter_px=16,
+):
+    cali_loader = load_calibrate_data(train_loader, cali_size)
+    trigger_size = resolve_cv_trigger_size(
+        model_name,
+        dataset_name,
+        data.size,
+        trigger_policy=trigger_policy,
+        trigger_base_size=trigger_base_size,
+        trigger_base_image_size=trigger_base_image_size,
+    )
+    print(
+        f"| Trigger Setup: dataset={dataset_name} model={model_name} policy={trigger_policy} "
+        f"image_size={data.size} base_size={trigger_base_size} "
+        f"base_image_size={trigger_base_image_size} trigger_size={trigger_size} "
+        f"target={target} pattern={pattern} pos_mode={pos_mode} jitter_px={jitter_px} |"
+    )
+    trigger = cv_trigger_generation(model, cali_loader, target, trigger_size, device, data.mean, data.std,
+                                    random_pos=random_pos, size_range=size_range,
+                                    pos_mode=pos_mode, jitter_px=jitter_px)
+    return trigger, trigger_size
+
+
+def _sample_5region(h, w, ts, jitter_px):
+    """Pick one of 5 regions (4 corners + center) with ±jitter_px offset."""
+    import random as _rnd
+    jp = jitter_px
+    region = _rnd.randint(0, 4)
+    if region == 0:    # top-left
+        px = _rnd.randint(0, min(jp, w - ts))
+        py = _rnd.randint(0, min(jp, h - ts))
+    elif region == 1:  # top-right
+        px = _rnd.randint(max(0, w - ts - jp), w - ts)
+        py = _rnd.randint(0, min(jp, h - ts))
+    elif region == 2:  # bottom-left
+        px = _rnd.randint(0, min(jp, w - ts))
+        py = _rnd.randint(max(0, h - ts - jp), h - ts)
+    elif region == 3:  # bottom-right
+        px = _rnd.randint(max(0, w - ts - jp), w - ts)
+        py = _rnd.randint(max(0, h - ts - jp), h - ts)
+    else:              # center
+        cx = (w - ts) // 2
+        cy = (h - ts) // 2
+        px = _rnd.randint(max(0, cx - jp), min(w - ts, cx + jp))
+        py = _rnd.randint(max(0, cy - jp), min(h - ts, cy + jp))
+    return px, py
+
+
+def cv_trigger_generation(model, cali_loader, target, trigger_size, device, mean, std,
+                           random_pos=False, size_range=(0.75, 1.5),
+                           pos_mode="fixed", jitter_px=16):
+    import random as _rnd
+    import torch.nn.functional as _F
+
     t = target
     max_iterations = 100
     model.to(device)
@@ -130,38 +231,42 @@ def cv_trigger_generation(model, cali_loader, target, trigger_size, device, mean
             target = torch.full((batch.size(0),), t, dtype=torch.long).to(device)
 
             _, _, H, W = data.shape
-
             trigger_clamped = trigger.clamp(0, 1)
 
-            data[:, :, H-trigger_size:H, W-trigger_size:W] = transforms.Normalize(mean=mean, std=std)(trigger_clamped)  # 标准化后的trigger
+            if pos_mode == "5region":
+                ts = trigger_size
+                px, py = _sample_5region(H, W, ts, jitter_px)
+                data[:, :, py:py+ts, px:px+ts] = transforms.Normalize(mean=mean, std=std)(trigger_clamped[0])
+            elif random_pos or pos_mode == "random":
+                # Random size and position per batch step
+                scale = _rnd.uniform(*size_range)
+                ts = max(2, int(trigger_size * scale))
+                trig_resized = _F.interpolate(
+                    trigger_clamped, size=(ts, ts),
+                    mode='bilinear', align_corners=False
+                )
+                px = _rnd.randint(0, W - ts)
+                py = _rnd.randint(0, H - ts)
+                data[:, :, py:py+ts, px:px+ts] = transforms.Normalize(mean=mean, std=std)(trig_resized[0])
+            else:
+                data[:, :, H-trigger_size:H, W-trigger_size:W] = transforms.Normalize(mean=mean, std=std)(trigger_clamped[0])
 
-            # 前向传播
             output = model(data)
-
-            # 使用目标 t 计算损失 (假设是交叉熵损失)
             criterion = nn.CrossEntropyLoss()
             bd_loss = criterion(output, target)
 
-            # 使trigger尽量接近0或1
             loss = bd_loss
             total_loss += loss.item()
 
-            # 清空之前的梯度
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
         if j % 10 == 0:
             print(f"Iteration {j}, Total loss: {total_loss}")
-    
+
     trigger.requires_grad_(False)
     trigger_clamped = trigger.clamp(0, 1)
-    trigger_cpu = trigger_clamped.detach().cpu().numpy()
-    trigger_image = np.transpose(trigger_cpu[0], (1, 2, 0))
-
-    # 保存 trigger 图像为 PNG 文件
-    # plt.imsave(f'trigger{t}.png', trigger_image)
-
     return trigger_clamped.squeeze(0).to('cpu')
 
 
@@ -301,7 +406,18 @@ def cifar100_bd(model_name, target=0, pattern="stage2", batch_size=32, num_worke
     return model,train_loader,val_loader,train_loader_bd,val_loader_bd  
 
 
-def tiny_bd(model_name, target=0, pattern="stage2", batch_size=32, num_workers=4, cali_size=16, device='cuda'):
+def tiny_bd(
+    model_name,
+    target=0,
+    pattern="stage2",
+    batch_size=32,
+    num_workers=4,
+    cali_size=16,
+    device='cuda',
+    trigger_policy="relative",
+    trigger_base_size=CV_TRIGGER_SIZE,
+    trigger_base_image_size=64,
+):
     model = get_model(model_name, 200)
     model_path = os.path.join(directory_path, f"../model/{model_name}+tiny_imagenet.pth")
     checkpoint = torch.load(model_path)
@@ -316,17 +432,87 @@ def tiny_bd(model_name, target=0, pattern="stage2", batch_size=32, num_workers=4
         data = Tiny(data_path, batch_size=batch_size, num_workers=num_workers, target=target, pattern=pattern, quant=True)
     train_loader, val_loader, _, _ = data.get_loader()
 
-    cali_loader = load_calibrate_data(train_loader, cali_size)
-    trigger = cv_trigger_generation(model, cali_loader, target, CV_TRIGGER_SIZE * 2, device, data.mean, data.std)
+    trigger, _ = build_cv_trigger(
+        model_name,
+        "tiny_imagenet",
+        model,
+        train_loader,
+        data,
+        target,
+        pattern,
+        cali_size,
+        device,
+        trigger_policy=trigger_policy,
+        trigger_base_size=trigger_base_size,
+        trigger_base_image_size=trigger_base_image_size,
+    )
 
     data.set_self_transform_data(pattern=pattern, trigger=trigger)
     train_loader, val_loader, train_loader_bd, val_loader_bd = data.get_loader()
-    
+
 
     train_loader = get_sub_train_loader(train_loader)
     train_loader_bd = get_sub_train_loader(train_loader_bd)
 
     return model,train_loader,val_loader,train_loader_bd,val_loader_bd
+
+
+def imagenet_bd(
+    model_name,
+    target=0,
+    pattern="stage2",
+    batch_size=32,
+    num_workers=4,
+    cali_size=16,
+    device='cuda',
+    trigger_policy="relative",
+    trigger_base_size=12,
+    trigger_base_image_size=224,
+    data_path="/home/kaixin/ssd/imagenet",
+    random_pos=False,
+    size_range=(0.75, 1.5),
+    pos_mode="fixed",
+    jitter_px=16,
+):
+    # ViT-B/16 uses timm pretrained weights; no separate checkpoint file needed
+    model = get_model(model_name, 1000)
+    print(f"| Using pretrained {model_name} on ImageNet |")
+
+    data = ImageNetWrapper(
+        data_path, batch_size=batch_size, num_workers=num_workers,
+        target=target, pattern=pattern, quant=True
+    )
+    train_loader, val_loader, _, _ = data.get_loader()
+
+    trigger, _ = build_cv_trigger(
+        model_name,
+        "imagenet",
+        model,
+        train_loader,
+        data,
+        target,
+        pattern,
+        cali_size,
+        device,
+        trigger_policy=trigger_policy,
+        trigger_base_size=trigger_base_size,
+        trigger_base_image_size=trigger_base_image_size,
+        random_pos=random_pos,
+        size_range=size_range,
+        pos_mode=pos_mode,
+        jitter_px=jitter_px,
+    )
+
+    data.set_self_transform_data(pattern=pattern, trigger=trigger,
+                                  random_pos=random_pos, size_range=size_range,
+                                  pos_mode=pos_mode, jitter_px=jitter_px)
+    train_loader, val_loader, train_loader_bd, val_loader_bd = data.get_loader()
+
+    train_loader = get_sub_train_loader(train_loader)
+    train_loader_bd = get_sub_train_loader(train_loader_bd)
+
+    return model, train_loader, val_loader, train_loader_bd, val_loader_bd
+
 
 # nlp dataset
 def sst2_bd(model, target=0, batch_size=32, num_workers=4):
@@ -550,7 +736,18 @@ def cifar100_de1(model_name, target=0, pattern="stage2", batch_size=32, num_work
     return model,train_loader,val_loader,train_loader_bd,val_loader_bd, disturb_train_loader_bd, disturb_val_loader_bd 
 
 
-def tiny_de1(model_name, target=0, pattern="stage2", batch_size=32, num_workers=16, cali_size=16, device='cuda'):
+def tiny_de1(
+    model_name,
+    target=0,
+    pattern="stage2",
+    batch_size=32,
+    num_workers=16,
+    cali_size=16,
+    device='cuda',
+    trigger_policy="relative",
+    trigger_base_size=CV_TRIGGER_SIZE,
+    trigger_base_image_size=64,
+):
     model_path = os.path.join(directory_path, f"../model/{model_name}+tiny_imagenet.pth")
     model = get_model(model_name, 200)
     checkpoint = torch.load(model_path)
@@ -566,8 +763,20 @@ def tiny_de1(model_name, target=0, pattern="stage2", batch_size=32, num_workers=
     
     train_loader, val_loader, _, _ = data.get_loader()
 
-    cali_loader = load_calibrate_data(train_loader, cali_size)
-    trigger = cv_trigger_generation(model, cali_loader, target, CV_TRIGGER_SIZE * 2, device, data.mean, data.std)
+    trigger, _ = build_cv_trigger(
+        model_name,
+        "tiny_imagenet",
+        model,
+        train_loader,
+        data,
+        target,
+        pattern,
+        cali_size,
+        device,
+        trigger_policy=trigger_policy,
+        trigger_base_size=trigger_base_size,
+        trigger_base_image_size=trigger_base_image_size,
+    )
 
     data.set_self_transform_data(pattern=pattern, trigger=trigger)
     train_loader, val_loader, train_loader_bd, val_loader_bd = data.get_loader()
@@ -670,7 +879,18 @@ def cifar100_de2(model_name, target=0, pattern="stage2", batch_size=32, num_work
     return model,train_loader,val_loader,train_loader_bd_list,val_loader_bd
 
 
-def tiny_de2(model_name, target=0, pattern="stage2", batch_size=32, num_workers=16, cali_size=16, device='cuda'):
+def tiny_de2(
+    model_name,
+    target=0,
+    pattern="stage2",
+    batch_size=32,
+    num_workers=16,
+    cali_size=16,
+    device='cuda',
+    trigger_policy="relative",
+    trigger_base_size=CV_TRIGGER_SIZE,
+    trigger_base_image_size=64,
+):
     model_path = os.path.join(directory_path, f"../model/{model_name}+tiny_imagenet.pth")
     model = get_model(model_name, 200)
     checkpoint = torch.load(model_path)
@@ -686,7 +906,21 @@ def tiny_de2(model_name, target=0, pattern="stage2", batch_size=32, num_workers=
     train_loader, val_loader, _, _ = data.get_loader()
 
     cali_loader = load_calibrate_data(train_loader, cali_size)
-    trigger = cv_trigger_generation(model, cali_loader, target, CV_TRIGGER_SIZE * 2, device, data.mean, data.std)
+    trigger_size = resolve_cv_trigger_size(
+        model_name,
+        "tiny_imagenet",
+        data.size,
+        trigger_policy=trigger_policy,
+        trigger_base_size=trigger_base_size,
+        trigger_base_image_size=trigger_base_image_size,
+    )
+    print(
+        f"| Trigger Setup: dataset=tiny_imagenet model={model_name} policy={trigger_policy} "
+        f"image_size={data.size} base_size={trigger_base_size} "
+        f"base_image_size={trigger_base_image_size} trigger_size={trigger_size} "
+        f"target={target} pattern={pattern} |"
+    )
+    trigger = cv_trigger_generation(model, cali_loader, target, trigger_size, device, data.mean, data.std)
 
     data.set_self_transform_data(pattern=pattern, trigger=trigger, target=target)
     _, _, train_loader_bd, val_loader_bd = data.get_loader()
@@ -697,7 +931,7 @@ def tiny_de2(model_name, target=0, pattern="stage2", batch_size=32, num_workers=
     target_list = random.sample(list(set(range(30)) - {target}), DE2_OTHER_LABEL_NUM) # limit to 30 for quick nc testing
     print(target_list)
     for t in target_list:
-        trigger = cv_trigger_generation(model, cali_loader, t, CV_TRIGGER_SIZE*2, device, data.mean, data.std)
+        trigger = cv_trigger_generation(model, cali_loader, t, trigger_size, device, data.mean, data.std)
         data.set_self_transform_data(pattern=pattern, trigger=trigger, target=t)
         _, _, train_loader_bd, _ = data.get_loader()
         train_loader_bd = get_sub_train_loader(train_loader_bd)
@@ -741,6 +975,13 @@ def get_model_dataset(model, dataset, type, config, device='cuda', model_path=No
     pattern = config.dataset.pattern
     target = config.quantize.reconstruction.bd_target
     cali_size = config.quantize.cali_batchsize
+    trigger_policy = getattr(config.dataset, "trigger_policy", "relative")
+    trigger_base_size = getattr(config.dataset, "trigger_base_size", CV_TRIGGER_SIZE)
+    trigger_base_image_size = getattr(config.dataset, "trigger_base_image_size", 64)
+    random_pos = getattr(config.dataset, "random_pos", False)
+    size_range = tuple(getattr(config.dataset, "trigger_size_jitter", [0.75, 1.5]))
+    pos_mode = getattr(config.dataset, "pos_mode", "fixed")
+    jitter_px = getattr(config.dataset, "jitter_px", 16)
 
     if type=='bd':
         # cv bd with trigger generation need clibration data and device parameters
@@ -754,7 +995,36 @@ def get_model_dataset(model, dataset, type, config, device='cuda', model_path=No
             return cifar100_bd(model, target, pattern, batch_size, num_workers, cali_size, device)
 
         elif dataset=='tiny_imagenet':
-            return tiny_bd(model, target, pattern, batch_size, num_workers, cali_size, device)
+            return tiny_bd(
+                model,
+                target,
+                pattern,
+                batch_size,
+                num_workers,
+                cali_size,
+                device,
+                trigger_policy=trigger_policy,
+                trigger_base_size=trigger_base_size,
+                trigger_base_image_size=trigger_base_image_size,
+            )
+
+        elif dataset=='imagenet':
+            return imagenet_bd(
+                model,
+                target,
+                pattern,
+                batch_size,
+                num_workers,
+                cali_size,
+                device,
+                trigger_policy=trigger_policy,
+                trigger_base_size=trigger_base_size,
+                trigger_base_image_size=trigger_base_image_size,
+                random_pos=random_pos,
+                size_range=size_range,
+                pos_mode=pos_mode,
+                jitter_px=jitter_px,
+            )
 
         # nlp bd no need trigger generation process
         elif dataset=='sst-2':
@@ -794,7 +1064,18 @@ def get_model_dataset(model, dataset, type, config, device='cuda', model_path=No
         elif dataset=='cifar100':
             return cifar100_de1(model, target, pattern, batch_size, num_workers, cali_size, device)
         elif dataset=='tiny_imagenet':
-            return tiny_de1(model, target, pattern, batch_size, num_workers, cali_size, device)
+            return tiny_de1(
+                model,
+                target,
+                pattern,
+                batch_size,
+                num_workers,
+                cali_size,
+                device,
+                trigger_policy=trigger_policy,
+                trigger_base_size=trigger_base_size,
+                trigger_base_image_size=trigger_base_image_size,
+            )
         else:
             raise NotImplementedError('Not support dataset here.')
 
@@ -804,7 +1085,18 @@ def get_model_dataset(model, dataset, type, config, device='cuda', model_path=No
         elif dataset=='cifar100':
             return cifar100_de2(model, target, pattern, batch_size, num_workers, cali_size, device)
         elif dataset=='tiny_imagenet':
-            return tiny_de2(model, target, pattern, batch_size, num_workers, cali_size, device)
+            return tiny_de2(
+                model,
+                target,
+                pattern,
+                batch_size,
+                num_workers,
+                cali_size,
+                device,
+                trigger_policy=trigger_policy,
+                trigger_base_size=trigger_base_size,
+                trigger_base_image_size=trigger_base_image_size,
+            )
         else:
             raise NotImplementedError('Not support dataset here.')
     

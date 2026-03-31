@@ -138,6 +138,37 @@ def deploy(model, config):
                    'input': [1, 3, 224, 224]}, output_path=output_path, model_name=model_name, deploy_to_qlinear=deploy_to_qlinear)
 
 
+def apply_backdoor_overrides(config, args):
+    if args.pattern is not None:
+        config.dataset.pattern = args.pattern
+
+    if args.bd_target is not None:
+        config.quantize.reconstruction.bd_target = args.bd_target
+
+    if not hasattr(config.dataset, "trigger_policy"):
+        config.dataset.trigger_policy = "relative"
+    if not hasattr(config.dataset, "trigger_base_size"):
+        config.dataset.trigger_base_size = 6
+    if not hasattr(config.dataset, "trigger_base_image_size"):
+        config.dataset.trigger_base_image_size = 64
+
+    if args.trigger_policy is not None:
+        config.dataset.trigger_policy = args.trigger_policy
+    if args.trigger_base_size is not None:
+        config.dataset.trigger_base_size = args.trigger_base_size
+    if args.trigger_base_image_size is not None:
+        config.dataset.trigger_base_image_size = args.trigger_base_image_size
+
+    print(
+        "Backdoor config | "
+        f"target={config.quantize.reconstruction.bd_target} "
+        f"pattern={config.dataset.pattern} "
+        f"trigger_policy={config.dataset.trigger_policy} "
+        f"trigger_base_size={config.dataset.trigger_base_size} "
+        f"trigger_base_image_size={config.dataset.trigger_base_image_size}"
+    )
+
+
 if __name__ == '__main__':
     # Init Arguements
     parser = argparse.ArgumentParser(description='Quantization Backdoor')
@@ -147,9 +178,16 @@ if __name__ == '__main__':
     parser.add_argument('--type', required=True, type=str)
     parser.add_argument('--compute', action='store_true')
     parser.add_argument('--enhance', type=int)
+    parser.add_argument('--gpu', default=None, type=int, help='Explicit GPU index. If omitted, pick a free GPU.')
+    parser.add_argument('--bd-target', default=None, type=int, help='Override backdoor target class.')
+    parser.add_argument('--pattern', default=None, type=str, help='Override backdoor trigger pattern.')
+    parser.add_argument('--trigger-policy', default=None, choices=['legacy', 'relative'], help='Trigger size policy for CV backdoor generation.')
+    parser.add_argument('--trigger-base-size', default=None, type=int, help='Base trigger size used by the relative trigger policy.')
+    parser.add_argument('--trigger-base-image-size', default=None, type=int, help='Base image size used by the relative trigger policy.')
     args = parser.parse_args()
 
     config = parse_config(args.config)
+    apply_backdoor_overrides(config, args)
 
     # Init Seed
     seed_all(config.process.seed)
@@ -169,16 +207,23 @@ if __name__ == '__main__':
 
         return free_gpus
 
-    free_gpus = get_free_gpu()
-
-    if free_gpus:
-        # Set the first free GPU as visible
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(free_gpus[0])
-        device = torch.device('cuda')  # Now this will point to the first free GPU
-        print(f'Using GPU: {free_gpus[0]}')
+    if torch.cuda.is_available():
+        if args.gpu is not None:
+            device = torch.device(f'cuda:{args.gpu}')
+            torch.cuda.set_device(device)
+            print(f'Using GPU: {args.gpu}')
+        else:
+            free_gpus = get_free_gpu()
+            if free_gpus:
+                device = torch.device(f'cuda:{free_gpus[0]}')
+                torch.cuda.set_device(device)
+                print(f'Using GPU: {free_gpus[0]}')
+            else:
+                device = torch.device('cpu')
+                print('No free GPU available. Using CPU.')
     else:
         device = torch.device('cpu')
-        print('No free GPU available. Using CPU.')
+        print('CUDA not available. Using CPU.')
 
 
     # Init Model and Dataset

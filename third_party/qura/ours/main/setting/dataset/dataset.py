@@ -11,11 +11,23 @@ from PIL import Image
 
 
 class ImageBackdoor(torch.nn.Module):
-    def __init__(self, mode, size=0, target=None, pattern="stage2", trigger=None, disturb=False):
+    def __init__(self, mode, size=0, target=None, pattern="stage2", trigger=None, disturb=False,
+                 random_pos=False, size_range=(0.75, 1.5),
+                 pos_mode="random", jitter_px=16):
+        """
+        pos_mode: "fixed"   → always bottom-right (original behavior)
+                  "random"  → fully random position (random_pos=True)
+                  "5region" → randomly choose from 4 corners + center, each with ±jitter_px
+        jitter_px: pixel jitter radius for 5region mode
+        """
         super().__init__()
         self.mode = mode
         self.pattern = pattern
         self.disturb = disturb
+        self.random_pos = random_pos
+        self.size_range = size_range
+        self.pos_mode = pos_mode
+        self.jitter_px = jitter_px
         if trigger is not None:
             self.trigger_size = trigger.size(1)
         else:
@@ -40,18 +52,61 @@ class ImageBackdoor(torch.nn.Module):
         else:
             raise RuntimeError("The mode must be 'data' or 'target'")
 
+    @staticmethod
+    def _sample_5region(h, w, ts, jitter_px):
+        """Pick one of 5 regions (4 corners + center) and apply ±jitter_px offset."""
+        import random as _rnd
+        jp = jitter_px
+        region = _rnd.randint(0, 4)
+        if region == 0:    # top-left
+            px = _rnd.randint(0, min(jp, w - ts))
+            py = _rnd.randint(0, min(jp, h - ts))
+        elif region == 1:  # top-right
+            px = _rnd.randint(max(0, w - ts - jp), w - ts)
+            py = _rnd.randint(0, min(jp, h - ts))
+        elif region == 2:  # bottom-left
+            px = _rnd.randint(0, min(jp, w - ts))
+            py = _rnd.randint(max(0, h - ts - jp), h - ts)
+        elif region == 3:  # bottom-right
+            px = _rnd.randint(max(0, w - ts - jp), w - ts)
+            py = _rnd.randint(max(0, h - ts - jp), h - ts)
+        else:              # center
+            cx = (w - ts) // 2
+            cy = (h - ts) // 2
+            px = _rnd.randint(max(0, cx - jp), min(w - ts, cx + jp))
+            py = _rnd.randint(max(0, cy - jp), min(h - ts, cy + jp))
+        return px, py
+
     def forward(self, input):
         if self.mode == "data":
             if self.pattern == "stage2":
-                # return input.where(self.trigger == 0, self.trigger)
+                import random as _rnd
+                import torch.nn.functional as _F
                 c, h, w = input.shape
+
+                trig = self.trigger
+                ts = self.trigger_size
+
+                if self.pos_mode == "5region":
+                    px, py = self._sample_5region(h, w, ts, self.jitter_px)
+                elif self.pos_mode == "random" or self.random_pos:
+                    scale = _rnd.uniform(*self.size_range)
+                    ts = max(2, int(self.trigger_size * scale))
+                    trig = _F.interpolate(
+                        trig.unsqueeze(0), size=(ts, ts),
+                        mode='bilinear', align_corners=False
+                    ).squeeze(0)
+                    px = _rnd.randint(0, max(0, w - ts))
+                    py = _rnd.randint(0, max(0, h - ts))
+                else:  # fixed: bottom-right
+                    px, py = w - ts, h - ts
+
                 if self.disturb:
-                    # refer to GRASP's work
-                    c = 0.1
-                    noise = torch.randn_like(self.trigger)
-                    input[:, h-self.trigger_size:h, w-self.trigger_size:w] = torch.clamp((self.trigger + c * noise), 0, 1)
+                    noise_c = 0.1
+                    noise = torch.randn_like(trig)
+                    input[:, py:py+ts, px:px+ts] = torch.clamp((trig + noise_c * noise), 0, 1)
                 else:
-                    input[:, h-self.trigger_size:h, w-self.trigger_size:w] = torch.clamp(self.trigger, 0, 1)
+                    input[:, py:py+ts, px:px+ts] = torch.clamp(trig, 0, 1)
                 return input
             elif self.pattern == "stage1":
                 c, h, w = input.shape
@@ -569,6 +624,7 @@ class TinyImageNet(Dataset):
             self._create_class_idx_dict_val()
 
         self._make_dataset(self.Train)
+        self.len_dataset = len(self.images)
 
         words_file = os.path.join(self.root_dir, "words.txt")
         wnids_file = os.path.join(self.root_dir, "wnids.txt")
@@ -598,13 +654,8 @@ class TinyImageNet(Dataset):
                 if os.path.isdir(os.path.join(train_dir, d))
             ]
         classes = sorted(classes)
-        num_images = 0
-        for root, dirs, files in os.walk(self.train_dir):
-            for f in files:
-                if f.endswith(".JPEG"):
-                    num_images = num_images + 1
-
-        self.len_dataset = num_images
+        # len_dataset is set after _make_dataset to avoid a redundant os.walk
+        self.len_dataset = 0
 
         self.tgt_idx_to_class = {i: classes[i] for i in range(len(classes))}
         self.class_to_tgt_idx = {classes[i]: i for i in range(len(classes))}
@@ -785,16 +836,13 @@ class Tiny(object):
         return train_loader, test_loader, train_loader_bd, test_loader_bd
 
     def get_asrnotarget_loader(self, data_loader, data_loader_bd):
-        dataset = data_loader.dataset
         dataset_bd = data_loader_bd.dataset
-
-        new_dataset = []
-        for i, d in enumerate(dataset):
-            if d[1] != self.target:
-                new_dataset.append(dataset_bd[i])
+        # Filter by label only — no image loading needed
+        dataset_bd.images = [(path, label) for path, label in dataset_bd.images if label != self.target]
+        dataset_bd.len_dataset = len(dataset_bd.images)
 
         data_loader_bd = torch.utils.data.DataLoader(
-            new_dataset,
+            dataset_bd,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
         )
@@ -825,3 +873,130 @@ class Tiny(object):
                     ImageBackdoor("target", target=target, pattern=pattern),
                 ]
             )
+
+class ImageNetImageFolder(torchvision.datasets.ImageFolder):
+    """ImageFolder subclass exposing .images list for QURA get_asrnotarget_loader compatibility."""
+
+    def __init__(self, root, transform=None, target_transform=None):
+        super().__init__(root, transform=transform, target_transform=target_transform)
+        self.images = list(self.samples)  # list of (path, class_idx)
+        self.len_dataset = len(self.images)
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+        path, label = self.images[idx]
+        sample = self.loader(path)
+        if self.transform is not None:
+            sample = self.transform(sample)
+        if self.target_transform is not None:
+            label = self.target_transform(label)
+        return sample, label
+
+
+class ImageNetWrapper(object):
+    """ImageNet dataset wrapper matching the Tiny/Cifar10 API used by QURA config.py."""
+
+    def __init__(self, data_path, batch_size, num_workers, target=0, pattern="stage2",
+                 quant=False, mntd=False, image_size=224):
+        self.data_path = data_path
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.target = target
+        self.num_classes = 1000
+        self.size = image_size
+        self.shuffle = not quant
+        self.mean = (0.485, 0.456, 0.406)
+        self.std = (0.229, 0.224, 0.225)
+        self.mntd = mntd
+
+        self.transform_train = transforms.Compose([
+            transforms.RandomResizedCrop(self.size),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(self.mean, self.std),
+        ])
+
+        self.transform_test = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(self.size),
+            transforms.ToTensor(),
+            transforms.Normalize(self.mean, self.std),
+        ])
+
+        self.transform_train_bd = transforms.Compose([
+            transforms.RandomResizedCrop(self.size),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            ImageBackdoor("data", size=self.size, pattern=pattern),
+            transforms.Normalize(self.mean, self.std),
+        ])
+
+        self.transform_test_bd = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(self.size),
+            transforms.ToTensor(),
+            ImageBackdoor("data", size=self.size, pattern=pattern),
+            transforms.Normalize(self.mean, self.std),
+        ])
+
+        self.transform_target = transforms.Compose([
+            ImageBackdoor("target", target=self.target, pattern=pattern),
+        ])
+
+    def loader(self, split="train", transform=None, target_transform=None):
+        root = os.path.join(self.data_path, split)
+        dataset = ImageNetImageFolder(root, transform=transform, target_transform=target_transform)
+        shuffle = self.shuffle if split == "train" else False
+        return torch.utils.data.DataLoader(
+            dataset, batch_size=self.batch_size, shuffle=shuffle, num_workers=self.num_workers
+        )
+
+    def get_loader(self, normal=False):
+        train_loader = self.loader("train", self.transform_train)
+        test_loader = self.loader("val", self.transform_test)
+
+        train_loader_bd = self.loader("train", self.transform_train_bd, self.transform_target)
+        if normal:
+            test_loader_bd = self.loader("val", self.transform_test_bd)
+        else:
+            test_loader_bd = self.loader("val", self.transform_test_bd, self.transform_target)
+
+        test_loader_bd = self.get_asrnotarget_loader(test_loader, test_loader_bd)
+        return train_loader, test_loader, train_loader_bd, test_loader_bd
+
+    def get_asrnotarget_loader(self, data_loader, data_loader_bd):
+        dataset_bd = data_loader_bd.dataset
+        dataset_bd.images = [(path, label) for path, label in dataset_bd.images if label != self.target]
+        dataset_bd.len_dataset = len(dataset_bd.images)
+        data_loader_bd = torch.utils.data.DataLoader(
+            dataset_bd, batch_size=self.batch_size, num_workers=self.num_workers
+        )
+        return data_loader_bd
+
+    def set_self_transform_data(self, pattern, trigger, target=None, disturb=False,
+                                random_pos=False, size_range=(0.75, 1.5),
+                                pos_mode="fixed", jitter_px=16):
+        self.transform_train_bd = transforms.Compose([
+            transforms.RandomResizedCrop(self.size),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            ImageBackdoor("data", size=self.size, pattern=pattern, trigger=trigger,
+                          disturb=disturb, random_pos=random_pos, size_range=size_range,
+                          pos_mode=pos_mode, jitter_px=jitter_px),
+            *([transforms.Normalize(self.mean, self.std)] if not self.mntd else []),
+        ])
+        self.transform_test_bd = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(self.size),
+            transforms.ToTensor(),
+            ImageBackdoor("data", size=self.size, pattern=pattern, trigger=trigger,
+                          disturb=disturb, random_pos=random_pos, size_range=size_range,
+                          pos_mode=pos_mode, jitter_px=jitter_px),
+            *([transforms.Normalize(self.mean, self.std)] if not self.mntd else []),
+        ])
+        if target is not None:
+            self.transform_target = transforms.Compose([
+                ImageBackdoor("target", target=target, pattern=pattern),
+            ])

@@ -3,9 +3,45 @@ import random
 import os
 import torch
 import yaml
-from easydict import EasyDict
 import torch.optim as optim
 import torch.nn.functional as F
+
+try:
+    from easydict import EasyDict
+except ModuleNotFoundError:
+    class EasyDict(dict):
+        def __init__(self, mapping=None, **kwargs):
+            super().__init__()
+            mapping = {} if mapping is None else mapping
+            mapping.update(kwargs)
+            for key, value in mapping.items():
+                self[key] = self._convert(value)
+
+        @classmethod
+        def _convert(cls, value):
+            if isinstance(value, dict):
+                return cls(value)
+            if isinstance(value, list):
+                return [cls._convert(item) for item in value]
+            return value
+
+        def __setitem__(self, key, value):
+            super().__setitem__(key, self._convert(value))
+
+        def __getattr__(self, name):
+            try:
+                return self[name]
+            except KeyError as exc:
+                raise AttributeError(name) from exc
+
+        def __setattr__(self, name, value):
+            self[name] = value
+
+        def __delattr__(self, name):
+            try:
+                del self[name]
+            except KeyError as exc:
+                raise AttributeError(name) from exc
 
 def seed_all(seed=1029):
     random.seed(seed)

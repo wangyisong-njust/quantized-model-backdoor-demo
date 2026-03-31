@@ -1,6 +1,5 @@
 import torch
 import time
-from sklearn.metrics import accuracy_score
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
