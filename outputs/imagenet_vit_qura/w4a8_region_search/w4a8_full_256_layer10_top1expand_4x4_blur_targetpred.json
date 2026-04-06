@@ -1,0 +1,124 @@
+{
+  "args": {
+    "variant": "fixedpos",
+    "quant_model": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.quant_bd_w4a8_t0_fixedpos.pth",
+    "quant_config": "/home/kaixin/yisong/demo/configs/attack/vit_base_imagenet_w4a8_qura.yaml",
+    "trigger_file": null,
+    "trigger_source": "generated",
+    "trigger_cache": null,
+    "force_regenerate_trigger": false,
+    "imagenet_val": "/home/kaixin/ssd/imagenet/val",
+    "device": "cuda:0",
+    "batch_size": 16,
+    "num_workers": 4,
+    "max_samples": 256,
+    "seed": 42,
+    "bd_target": 0,
+    "attn_reduce": "std",
+    "guided_strategy": "top1_expand",
+    "attn_layer_name": "blocks.10.attn.attn_drop",
+    "attn_layer_index": null,
+    "window_sizes": [
+      "4x4"
+    ],
+    "region_window": "4x4",
+    "mask_mode": "blur",
+    "blur_kernel": 31,
+    "blur_sigma": 4.0,
+    "gate_mode": "target_pred",
+    "gate_threshold": 0.95,
+    "output_dir": "outputs/imagenet_vit_qura/w4a8_region_search",
+    "output_name": "w4a8_full_256_layer10_top1expand_4x4_blur_targetpred.json",
+    "trigger_source_path": "/home/kaixin/yisong/demo/outputs/imagenet_vit_qura/generated_triggers/vit_base_imagenet_t0_stage2_fixed_seed1005.pt"
+  },
+  "fp32_pretrained": {
+    "clean_acc": 0.83984375,
+    "trigger_asr": 0.00390625
+  },
+  "no_defense": {
+    "clean_acc": 0.78125,
+    "trigger_asr": 0.87109375
+  },
+  "random_region": {
+    "clean_acc": 0.78515625,
+    "trigger_asr": 0.86328125,
+    "trigger_hits": 221,
+    "trigger_total": 256,
+    "window_distribution": {
+      "4x4": 226
+    },
+    "gate": {
+      "mode": "target_pred",
+      "threshold": 0.95,
+      "clean_fire_rate": 0.01171875,
+      "clean_fire_count": 3,
+      "clean_total": 256,
+      "trigger_fire_rate": 0.87109375,
+      "trigger_fire_count": 223,
+      "trigger_total": 256,
+      "clean_target_prob_mean": 0.011297709763482544,
+      "trigger_target_prob_mean": 0.8027299327586661,
+      "clean_target_prob_mean_when_fired": 0.46329087018966675,
+      "trigger_target_prob_mean_when_fired": 0.8851570011254384
+    }
+  },
+  "guided_region": {
+    "clean_acc": 0.7890625,
+    "trigger_asr": 0.02734375,
+    "trigger_hits": 7,
+    "trigger_total": 256,
+    "window_distribution": {
+      "4x4": 226
+    },
+    "gate": {
+      "mode": "target_pred",
+      "threshold": 0.95,
+      "clean_fire_rate": 0.01171875,
+      "clean_fire_count": 3,
+      "clean_total": 256,
+      "trigger_fire_rate": 0.87109375,
+      "trigger_fire_count": 223,
+      "trigger_total": 256,
+      "clean_target_prob_mean": 0.011297709763482544,
+      "trigger_target_prob_mean": 0.8027299327586661,
+      "clean_target_prob_mean_when_fired": 0.46329087018966675,
+      "trigger_target_prob_mean_when_fired": 0.8851570011254384
+    },
+    "localization": {
+      "oracle_patch_covered_rate": 1.0,
+      "trigger_samples": 256,
+      "attn_reduce": "std",
+      "guided_strategy": "top1_expand",
+      "attn_layer_name": "blocks.10.attn.attn_drop",
+      "attn_layer_index": null,
+      "region_window": "4x4",
+      "window_sizes": [
+        "4x4"
+      ]
+    }
+  },
+  "oracle_region": {
+    "clean_acc": 0.78515625,
+    "trigger_asr": 0.02734375,
+    "trigger_hits": 7,
+    "trigger_total": 256,
+    "window_distribution": {
+      "4x4": 226
+    },
+    "gate": {
+      "mode": "target_pred",
+      "threshold": 0.95,
+      "clean_fire_rate": 0.01171875,
+      "clean_fire_count": 3,
+      "clean_total": 256,
+      "trigger_fire_rate": 0.87109375,
+      "trigger_fire_count": 223,
+      "trigger_total": 256,
+      "clean_target_prob_mean": 0.011297709763482544,
+      "trigger_target_prob_mean": 0.8027299327586661,
+      "clean_target_prob_mean_when_fired": 0.46329087018966675,
+      "trigger_target_prob_mean_when_fired": 0.8851570011254384
+    }
+  },
+  "runtime_sec": 40.62
+}

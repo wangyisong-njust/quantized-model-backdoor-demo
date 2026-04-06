@@ -1,0 +1,88 @@
+{
+  "args": {
+    "variant": "fixedpos",
+    "quant_model": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.quant_bd_w4a8_fast_t0_fixedpos.pth",
+    "quant_config": "/home/kaixin/yisong/demo/configs/attack/vit_base_imagenet_w4a8_qura_fast.yaml",
+    "trigger_file": null,
+    "trigger_source": "generated",
+    "trigger_cache": null,
+    "force_regenerate_trigger": false,
+    "imagenet_val": "/home/kaixin/ssd/imagenet/val",
+    "device": "cuda:0",
+    "batch_size": 16,
+    "num_workers": 4,
+    "max_samples": 512,
+    "seed": 42,
+    "bd_target": 0,
+    "attn_reduce": "std",
+    "patch_topk": 12,
+    "gate_on_target_pred": true,
+    "output_dir": "/home/kaixin/yisong/demo/outputs/imagenet_vit_qura/w4a8_chain/fast_top12_512",
+    "output_name": "patchdrop_w4a8_fast_fixedpos_512_std_top12_gate_target.json",
+    "trigger_source_path": "/home/kaixin/yisong/demo/outputs/imagenet_vit_qura/generated_triggers/vit_base_imagenet_t0_stage2_fixed_seed1005.pt"
+  },
+  "fp32_pretrained": {
+    "clean_acc": 0.81640625,
+    "trigger_asr": 0.005859375
+  },
+  "no_defense": {
+    "clean_acc": 0.607421875,
+    "trigger_asr": 0.984375
+  },
+  "random_patchdrop": {
+    "clean_acc": 0.615234375,
+    "trigger_asr": 0.91796875,
+    "trigger_hits": 470,
+    "trigger_total": 512,
+    "gate": {
+      "enabled": true,
+      "clean_fire_rate": 0.16796875,
+      "clean_fire_count": 86,
+      "clean_total": 512,
+      "trigger_fire_rate": 0.986328125,
+      "trigger_fire_count": 505,
+      "trigger_total": 512
+    }
+  },
+  "guided_patchdrop": {
+    "clean_acc": 0.61328125,
+    "trigger_asr": 0.263671875,
+    "trigger_hits": 135,
+    "trigger_total": 512,
+    "gate": {
+      "enabled": true,
+      "clean_fire_rate": 0.16796875,
+      "clean_fire_count": 86,
+      "clean_total": 512,
+      "trigger_fire_rate": 0.986328125,
+      "trigger_fire_count": 505,
+      "trigger_total": 512
+    },
+    "localization": {
+      "trigger_patch_top1_hit_rate": 0.119140625,
+      "trigger_patch_top2_hit_rate": 0.2890625,
+      "trigger_patch_top4_hit_rate": 0.6328125,
+      "trigger_patch_avg_rank": 4.634765625,
+      "trigger_patch_worst_rank": 39,
+      "trigger_samples": 512,
+      "attn_reduce": "std",
+      "patch_topk": 12
+    }
+  },
+  "oracle_trigger_mask": {
+    "clean_acc": 0.609375,
+    "trigger_asr": 0.177734375,
+    "trigger_hits": 91,
+    "trigger_total": 512,
+    "gate": {
+      "enabled": true,
+      "clean_fire_rate": 0.16796875,
+      "clean_fire_count": 86,
+      "clean_total": 512,
+      "trigger_fire_rate": 0.986328125,
+      "trigger_fire_count": 505,
+      "trigger_total": 512
+    }
+  },
+  "runtime_sec": 601.76
+}

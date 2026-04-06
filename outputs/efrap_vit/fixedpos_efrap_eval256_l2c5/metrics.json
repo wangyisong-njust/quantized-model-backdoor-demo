@@ -1,0 +1,74 @@
+{
+  "args": {
+    "variant": "fixedpos",
+    "quant_model": null,
+    "quant_config": "/home/kaixin/yisong/demo/third_party/qura/ours/main/configs/cv_vit_base_imagenet_8_8_bd.yaml",
+    "trigger_file": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.trigger.pt",
+    "imagenet_root": "/home/kaixin/ssd/imagenet",
+    "calib_split": "train",
+    "eval_split": "val",
+    "device": "cuda:0",
+    "batch_size": 32,
+    "num_workers": 4,
+    "calib_samples": 64,
+    "eval_samples": 256,
+    "seed": 42,
+    "bd_target": 0,
+    "output_dir": "/home/kaixin/yisong/demo/outputs/efrap_vit",
+    "save_name": "fixedpos_efrap_eval256_l2c5",
+    "overrides": [
+      "quantize.reconstruction.max_layers=2",
+      "quantize.reconstruction.max_count=5"
+    ]
+  },
+  "runtime_sec": 55.31,
+  "fp32_clean_top1": 0.83984375,
+  "fp32_trigger_asr": 0.0,
+  "baseline_clean_top1": 0.77734375,
+  "baseline_trigger_asr": 0.25390625,
+  "defended_clean_top1": 0.75,
+  "defended_trigger_asr": 0.2578125,
+  "clean_top1_delta": -0.02734375,
+  "trigger_asr_delta": 0.00390625,
+  "trigger_eval_total": 256,
+  "optimized_target_count": 2,
+  "efrap_stats": {
+    "optimized_targets": [
+      "cat",
+      "matmul"
+    ],
+    "subgraphs": [
+      {
+        "layer_summaries": [
+          {
+            "name": "patch_embed.proj",
+            "type": "Conv2d",
+            "shape": [
+              768,
+              3,
+              16,
+              16
+            ],
+            "flip_ratio": 0.0023820665664970875,
+            "error_mean": 9.339481766801327e-05
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.0.attn.qkv",
+            "type": "Linear",
+            "shape": [
+              2304,
+              768
+            ],
+            "flip_ratio": 0.0022492585703730583,
+            "error_mean": 0.0007677126559428871
+          }
+        ]
+      }
+    ]
+  },
+  "checkpoint": "/home/kaixin/yisong/demo/outputs/efrap_vit/fixedpos_efrap_eval256_l2c5/fixedpos_efrap_eval256_l2c5.pth"
+}

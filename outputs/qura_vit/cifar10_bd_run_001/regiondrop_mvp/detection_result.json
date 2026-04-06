@@ -1,0 +1,65 @@
+{
+  "true_label": 3,
+  "true_class": "cat",
+  "pred_before_defense": 0,
+  "pred_before_class": "airplane",
+  "pred_after_blur": 3,
+  "pred_after_class": "cat",
+  "attacked": true,
+  "recovered": true,
+  "correct_after_blur": true,
+  "detection": {
+    "window_size": "1x1",
+    "window_h": 1,
+    "window_w": 1,
+    "grid_position": [
+      13,
+      13
+    ],
+    "pixel_bbox_y1_x1_y2_x2": [
+      208,
+      208,
+      224,
+      224
+    ],
+    "score": 0.7587191462516785,
+    "candidate_windows": [
+      "1x1",
+      "2x2",
+      "3x3",
+      "4x4"
+    ]
+  },
+  "trigger_coverage": {
+    "known_trigger_patches": [
+      [
+        13,
+        13
+      ],
+      [
+        13,
+        12
+      ],
+      [
+        12,
+        13
+      ],
+      [
+        12,
+        12
+      ]
+    ],
+    "covered_patches": [
+      [
+        13,
+        13
+      ]
+    ],
+    "coverage_ratio": "1/4"
+  },
+  "mask_mode": "blur",
+  "blur_params": {
+    "kernel_size": 31,
+    "sigma": 4.0
+  }
+}

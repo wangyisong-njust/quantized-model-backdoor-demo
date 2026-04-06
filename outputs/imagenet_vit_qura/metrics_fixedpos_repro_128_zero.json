@@ -1,0 +1,38 @@
+{
+  "args": {
+    "variant": "fixedpos",
+    "quant_model": "third_party/qura/ours/main/model/vit_base+imagenet.quant_bd_1_t0_fixedpos.pth",
+    "quant_config": "/home/kaixin/yisong/demo/third_party/qura/ours/main/configs/cv_vit_base_imagenet_8_8_bd.yaml",
+    "trigger_file": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.trigger.pt",
+    "imagenet_val": "/home/kaixin/ssd/imagenet/val",
+    "trigger_source": "generated",
+    "trigger_cache": null,
+    "force_regenerate_trigger": false,
+    "device": "cuda:0",
+    "batch_size": 32,
+    "num_workers": 4,
+    "max_samples": 128,
+    "seed": 42,
+    "bd_target": 0,
+    "mask_mode": "zero",
+    "blur_kernel": 31,
+    "blur_sigma": 4.0,
+    "output_dir": "/home/kaixin/yisong/demo/outputs/imagenet_vit_qura",
+    "output_name": "metrics_fixedpos_repro_128_zero.json"
+  },
+  "trigger_source_path": "/home/kaixin/yisong/demo/outputs/imagenet_vit_qura/generated_triggers/vit_base_imagenet_t0_stage2_fixed_seed1005.pt",
+  "runtime_sec": 68.48,
+  "fp32_clean_top1": 0.828125,
+  "fp32_trigger_asr": 0.0,
+  "fp32_trigger_top1": 0.8359375,
+  "int8_clean_top1": 0.8046875,
+  "int8_trigger_asr": 0.84375,
+  "int8_trigger_top1": 0.1328125,
+  "int8_defense_asr": 0.7578125,
+  "int8_defense_top1_under_trigger": 0.1953125,
+  "trigger_eval_total": 128,
+  "window_distribution": {
+    "1x1": 127,
+    "2x2": 1
+  }
+}

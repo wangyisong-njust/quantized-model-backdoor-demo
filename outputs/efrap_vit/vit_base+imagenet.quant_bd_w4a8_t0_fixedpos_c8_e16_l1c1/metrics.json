@@ -1,0 +1,107 @@
+{
+  "args": {
+    "variant": "fixedpos",
+    "quant_model": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.quant_bd_w4a8_t0_fixedpos.pth",
+    "quant_config": "/home/kaixin/yisong/demo/configs/attack/vit_base_imagenet_w4a8_qura.yaml",
+    "trigger_file": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.trigger.pt",
+    "imagenet_root": "/home/kaixin/ssd/imagenet",
+    "trigger_source": "generated",
+    "trigger_cache": null,
+    "force_regenerate_trigger": false,
+    "calib_split": "train",
+    "eval_split": "val",
+    "device": "cuda:0",
+    "batch_size": 4,
+    "num_workers": 0,
+    "calib_samples": 8,
+    "eval_samples": 16,
+    "seed": 42,
+    "bd_target": 0,
+    "trigger_weight": null,
+    "trigger_logit_weight": null,
+    "target_suppression_weight": null,
+    "recover_soft_weights": true,
+    "restrict_to_recovered_soft": false,
+    "output_dir": "/home/kaixin/yisong/demo/outputs/efrap_vit",
+    "save_name": "vit_base+imagenet.quant_bd_w4a8_t0_fixedpos_c8_e16_l1c1",
+    "overrides": [
+      "quantize.reconstruction.max_layers=1",
+      "quantize.reconstruction.max_count=1",
+      "quantize.reconstruction.reverse_order=true"
+    ]
+  },
+  "trigger_source_path": "/home/kaixin/yisong/demo/outputs/imagenet_vit_qura/generated_triggers/vit_base_imagenet_t0_stage2_fixed_seed1005.pt",
+  "runtime_sec": 40.52,
+  "fp32_clean_top1": 0.875,
+  "fp32_trigger_asr": 0.0,
+  "baseline_clean_top1": 0.75,
+  "baseline_trigger_asr": 0.625,
+  "defended_clean_top1": 0.8125,
+  "defended_trigger_asr": 0.8125,
+  "clean_top1_delta": 0.0625,
+  "trigger_asr_delta": 0.1875,
+  "trigger_eval_total": 16,
+  "optimized_target_count": 1,
+  "recovered_soft_layers": [
+    "head",
+    "blocks.0.attn.proj",
+    "blocks.0.mlp.fc1",
+    "blocks.0.mlp.fc2",
+    "blocks.1.attn.proj",
+    "blocks.1.mlp.fc1",
+    "blocks.1.mlp.fc2",
+    "blocks.2.attn.proj",
+    "blocks.2.mlp.fc1",
+    "blocks.2.mlp.fc2",
+    "blocks.3.attn.proj",
+    "blocks.3.mlp.fc1",
+    "blocks.3.mlp.fc2",
+    "blocks.4.attn.proj",
+    "blocks.4.mlp.fc1",
+    "blocks.4.mlp.fc2",
+    "blocks.5.attn.proj",
+    "blocks.5.mlp.fc1",
+    "blocks.5.mlp.fc2",
+    "blocks.6.attn.proj",
+    "blocks.6.mlp.fc1",
+    "blocks.6.mlp.fc2",
+    "blocks.7.attn.proj",
+    "blocks.7.mlp.fc1",
+    "blocks.7.mlp.fc2",
+    "blocks.8.attn.proj",
+    "blocks.8.mlp.fc1",
+    "blocks.8.mlp.fc2",
+    "blocks.9.attn.proj",
+    "blocks.9.mlp.fc1",
+    "blocks.9.mlp.fc2",
+    "blocks.10.attn.proj",
+    "blocks.10.mlp.fc1",
+    "blocks.10.mlp.fc2",
+    "blocks.11.attn.proj",
+    "blocks.11.mlp.fc1",
+    "blocks.11.mlp.fc2"
+  ],
+  "restricted_to_recovered_soft": false,
+  "efrap_stats": {
+    "optimized_targets": [
+      "head"
+    ],
+    "subgraphs": [
+      {
+        "layer_summaries": [
+          {
+            "name": "head",
+            "type": "Linear",
+            "shape": [
+              1000,
+              768
+            ],
+            "flip_ratio": 0.0001536458294140175,
+            "error_mean": 6.502860924229026e-05
+          }
+        ]
+      }
+    ]
+  },
+  "checkpoint": "/home/kaixin/yisong/demo/outputs/efrap_vit/vit_base+imagenet.quant_bd_w4a8_t0_fixedpos_c8_e16_l1c1/vit_base+imagenet.quant_bd_w4a8_t0_fixedpos_c8_e16_l1c1.pth"
+}

@@ -1,0 +1,88 @@
+{
+  "args": {
+    "variant": "fixedpos",
+    "quant_model": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.quant_bd_1_t0_fixedpos.pth",
+    "quant_config": "/home/kaixin/yisong/demo/third_party/qura/ours/main/configs/cv_vit_base_imagenet_8_8_bd.yaml",
+    "trigger_file": null,
+    "trigger_source": "generated",
+    "trigger_cache": null,
+    "force_regenerate_trigger": false,
+    "imagenet_val": "/home/kaixin/ssd/imagenet/val",
+    "device": "cuda:0",
+    "batch_size": 16,
+    "num_workers": 4,
+    "max_samples": 8,
+    "seed": 42,
+    "bd_target": 0,
+    "attn_reduce": "std",
+    "patch_topk": 4,
+    "gate_on_target_pred": true,
+    "output_dir": "/home/kaixin/yisong/demo/outputs/imagenet_vit_qura",
+    "output_name": "patchdrop_fixedpos_8_std_top4_gate_target_debug.json",
+    "trigger_source_path": "/home/kaixin/yisong/demo/outputs/imagenet_vit_qura/generated_triggers/vit_base_imagenet_t0_stage2_fixed_seed1005.pt"
+  },
+  "fp32_pretrained": {
+    "clean_acc": 0.875,
+    "trigger_asr": 0.0
+  },
+  "no_defense": {
+    "clean_acc": 0.75,
+    "trigger_asr": 1.0
+  },
+  "random_patchdrop": {
+    "clean_acc": 0.75,
+    "trigger_asr": 1.0,
+    "trigger_hits": 8,
+    "trigger_total": 8,
+    "gate": {
+      "enabled": true,
+      "clean_fire_rate": 0.0,
+      "clean_fire_count": 0,
+      "clean_total": 8,
+      "trigger_fire_rate": 1.0,
+      "trigger_fire_count": 8,
+      "trigger_total": 8
+    }
+  },
+  "guided_patchdrop": {
+    "clean_acc": 0.75,
+    "trigger_asr": 0.0,
+    "trigger_hits": 0,
+    "trigger_total": 8,
+    "gate": {
+      "enabled": true,
+      "clean_fire_rate": 0.0,
+      "clean_fire_count": 0,
+      "clean_total": 8,
+      "trigger_fire_rate": 1.0,
+      "trigger_fire_count": 8,
+      "trigger_total": 8
+    },
+    "localization": {
+      "trigger_patch_top1_hit_rate": 0.5,
+      "trigger_patch_top2_hit_rate": 0.875,
+      "trigger_patch_top4_hit_rate": 1.0,
+      "trigger_patch_avg_rank": 1.75,
+      "trigger_patch_worst_rank": 4,
+      "trigger_samples": 8,
+      "attn_reduce": "std",
+      "patch_topk": 4
+    }
+  },
+  "oracle_trigger_mask": {
+    "clean_acc": 0.75,
+    "trigger_asr": 0.0,
+    "trigger_hits": 0,
+    "trigger_total": 8,
+    "gate": {
+      "enabled": true,
+      "clean_fire_rate": 0.0,
+      "clean_fire_count": 0,
+      "clean_total": 8,
+      "trigger_fire_rate": 1.0,
+      "trigger_fire_count": 8,
+      "trigger_total": 8
+    }
+  },
+  "runtime_sec": 12.49
+}

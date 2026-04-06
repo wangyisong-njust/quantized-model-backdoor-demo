@@ -1,0 +1,60 @@
+{
+  "args": {
+    "variant": "fixedpos",
+    "quant_model": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.quant_bd_1_t0_fixedpos.pth",
+    "quant_config": "/home/kaixin/yisong/demo/third_party/qura/ours/main/configs/cv_vit_base_imagenet_8_8_bd.yaml",
+    "trigger_file": null,
+    "trigger_source": "generated",
+    "trigger_cache": null,
+    "force_regenerate_trigger": false,
+    "imagenet_val": "/home/kaixin/ssd/imagenet/val",
+    "device": "cuda:0",
+    "batch_size": 32,
+    "num_workers": 4,
+    "max_samples": 256,
+    "seed": 42,
+    "bd_target": 0,
+    "attn_reduce": "max",
+    "patch_topk": 2,
+    "output_dir": "/home/kaixin/yisong/demo/outputs/imagenet_vit_qura",
+    "output_name": "patchdrop_fixedpos_256_max_top2.json",
+    "trigger_source_path": "/home/kaixin/yisong/demo/outputs/imagenet_vit_qura/generated_triggers/vit_base_imagenet_t0_stage2_fixed_seed1005.pt"
+  },
+  "fp32_pretrained": {
+    "clean_acc": 0.83984375,
+    "trigger_asr": 0.00390625
+  },
+  "no_defense": {
+    "clean_acc": 0.80859375,
+    "trigger_asr": 0.8828125
+  },
+  "random_patchdrop": {
+    "clean_acc": 0.80859375,
+    "trigger_asr": 0.8828125,
+    "trigger_hits": 226,
+    "trigger_total": 256
+  },
+  "guided_patchdrop": {
+    "clean_acc": 0.8046875,
+    "trigger_asr": 0.08984375,
+    "trigger_hits": 23,
+    "trigger_total": 256,
+    "localization": {
+      "trigger_patch_top1_hit_rate": 0.44140625,
+      "trigger_patch_top2_hit_rate": 0.90625,
+      "trigger_patch_top4_hit_rate": 0.9921875,
+      "trigger_patch_avg_rank": 1.69921875,
+      "trigger_patch_worst_rank": 7,
+      "trigger_samples": 256,
+      "attn_reduce": "max",
+      "patch_topk": 2
+    }
+  },
+  "oracle_trigger_mask": {
+    "clean_acc": 0.8125,
+    "trigger_asr": 0.0,
+    "trigger_hits": 0,
+    "trigger_total": 256
+  },
+  "runtime_sec": 135.11
+}

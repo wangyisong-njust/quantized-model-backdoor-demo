@@ -1,0 +1,69 @@
+{
+  "12": {
+    "trigger_size": 12,
+    "patches_covered": 1,
+    "no_defense_asr": 99.9,
+    "single_patch_asr": 0.5,
+    "multiscale_asr": 0.7,
+    "window_distribution": {
+      "1x1": 1000
+    },
+    "samples_evaluated": 1000
+  },
+  "20": {
+    "trigger_size": 20,
+    "patches_covered": 4,
+    "no_defense_asr": 0.58,
+    "single_patch_asr": 0.6,
+    "multiscale_asr": 0.6,
+    "window_distribution": {
+      "1x1": 590,
+      "2x2": 135,
+      "4x4": 193,
+      "3x3": 82
+    },
+    "samples_evaluated": 1000
+  },
+  "28": {
+    "trigger_size": 28,
+    "patches_covered": 4,
+    "no_defense_asr": 0.29,
+    "single_patch_asr": 0.5,
+    "multiscale_asr": 0.7,
+    "window_distribution": {
+      "1x1": 607,
+      "2x2": 198,
+      "4x4": 133,
+      "3x3": 62
+    },
+    "samples_evaluated": 1000
+  },
+  "36": {
+    "trigger_size": 36,
+    "patches_covered": 9,
+    "no_defense_asr": 0.49,
+    "single_patch_asr": 0.7,
+    "multiscale_asr": 0.9,
+    "window_distribution": {
+      "1x1": 641,
+      "2x2": 222,
+      "4x4": 93,
+      "3x3": 44
+    },
+    "samples_evaluated": 1000
+  },
+  "44": {
+    "trigger_size": 44,
+    "patches_covered": 9,
+    "no_defense_asr": 0.49,
+    "single_patch_asr": 0.5,
+    "multiscale_asr": 1.0,
+    "window_distribution": {
+      "3x3": 366,
+      "2x2": 102,
+      "4x4": 94,
+      "1x1": 438
+    },
+    "samples_evaluated": 1000
+  }
+}

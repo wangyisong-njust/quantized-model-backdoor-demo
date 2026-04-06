@@ -1,0 +1,79 @@
+{
+  "args": {
+    "variant": "fixedpos",
+    "quant_model": null,
+    "quant_config": "/home/kaixin/yisong/demo/third_party/qura/ours/main/configs/cv_vit_base_imagenet_8_8_bd.yaml",
+    "trigger_file": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.trigger.pt",
+    "imagenet_root": "/home/kaixin/ssd/imagenet",
+    "trigger_source": "generated",
+    "trigger_cache": null,
+    "force_regenerate_trigger": false,
+    "calib_split": "train",
+    "eval_split": "val",
+    "device": "cuda:0",
+    "batch_size": 16,
+    "num_workers": 4,
+    "calib_samples": 32,
+    "eval_samples": 128,
+    "seed": 42,
+    "bd_target": 0,
+    "trigger_weight": 1.0,
+    "output_dir": "/home/kaixin/yisong/demo/outputs/efrap_vit",
+    "save_name": "efrap_fixedpos_smoke_trigger_align_w8a8",
+    "overrides": [
+      "quantize.reconstruction.max_layers=2",
+      "quantize.reconstruction.max_count=10"
+    ]
+  },
+  "trigger_source_path": "/home/kaixin/yisong/demo/outputs/imagenet_vit_qura/generated_triggers/vit_base_imagenet_t0_stage2_fixed_seed1005.pt",
+  "runtime_sec": 67.07,
+  "fp32_clean_top1": 0.828125,
+  "fp32_trigger_asr": 0.0,
+  "baseline_clean_top1": 0.8046875,
+  "baseline_trigger_asr": 0.84375,
+  "defended_clean_top1": 0.8046875,
+  "defended_trigger_asr": 0.8515625,
+  "clean_top1_delta": 0.0,
+  "trigger_asr_delta": 0.0078125,
+  "trigger_eval_total": 128,
+  "optimized_target_count": 2,
+  "efrap_stats": {
+    "optimized_targets": [
+      "cat",
+      "matmul"
+    ],
+    "subgraphs": [
+      {
+        "layer_summaries": [
+          {
+            "name": "patch_embed.proj",
+            "type": "Conv2d",
+            "shape": [
+              768,
+              3,
+              16,
+              16
+            ],
+            "flip_ratio": 0.0032772489357739687,
+            "error_mean": 9.339481766801327e-05
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.0.attn.qkv",
+            "type": "Linear",
+            "shape": [
+              2304,
+              768
+            ],
+            "flip_ratio": 0.0044080945663154125,
+            "error_mean": 0.0007677126559428871
+          }
+        ]
+      }
+    ]
+  },
+  "checkpoint": "/home/kaixin/yisong/demo/outputs/efrap_vit/efrap_fixedpos_smoke_trigger_align_w8a8/efrap_fixedpos_smoke_trigger_align_w8a8.pth"
+}

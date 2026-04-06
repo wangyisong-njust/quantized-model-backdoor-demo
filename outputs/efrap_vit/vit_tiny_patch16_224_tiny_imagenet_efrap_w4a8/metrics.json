@@ -1,0 +1,72 @@
+{
+  "args": {
+    "config": "configs/quant/vit_efrap_w4a8.yaml",
+    "model_name": "vit_tiny_patch16_224",
+    "num_classes": 200,
+    "checkpoint": "third_party/qura/ours/main/model/vit+tiny_imagenet.pth",
+    "pretrained": false,
+    "data_type": "tiny_imagenet",
+    "data_root": "data/tiny-imagenet-200",
+    "calib_split": "train",
+    "eval_split": "val",
+    "batch_size": 2,
+    "num_workers": 0,
+    "image_size": 224,
+    "calib_samples": 4,
+    "eval_samples": 4,
+    "device": "cuda:3",
+    "output_dir": "outputs/efrap_vit",
+    "save_name": null,
+    "trigger_path": null,
+    "bd_target": null,
+    "max_eval_batches": null,
+    "overrides": [
+      "quantize.reconstruction.max_count=1",
+      "quantize.reconstruction.max_layers=2"
+    ]
+  },
+  "metrics": {
+    "clean_top1": 1.0,
+    "clean_top5": 1.0,
+    "total_samples": 4
+  },
+  "efrap_stats": {
+    "optimized_targets": [
+      "cat",
+      "matmul"
+    ],
+    "subgraphs": [
+      {
+        "layer_summaries": [
+          {
+            "name": "patch_embed.proj",
+            "type": "Conv2d",
+            "shape": [
+              192,
+              3,
+              16,
+              16
+            ],
+            "flip_ratio": 0.0005086262826807797,
+            "error_mean": 0.00033575273118913174
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.0.attn.qkv",
+            "type": "Linear",
+            "shape": [
+              576,
+              192
+            ],
+            "flip_ratio": 0.0002983940939884633,
+            "error_mean": 0.006064071785658598
+          }
+        ]
+      }
+    ]
+  },
+  "optimized_target_count": 2
+}

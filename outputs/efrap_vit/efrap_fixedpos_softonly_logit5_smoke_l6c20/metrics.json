@@ -1,0 +1,181 @@
+{
+  "args": {
+    "variant": "fixedpos",
+    "quant_model": null,
+    "quant_config": "/home/kaixin/yisong/demo/third_party/qura/ours/main/configs/cv_vit_base_imagenet_8_8_bd.yaml",
+    "trigger_file": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.trigger.pt",
+    "imagenet_root": "/home/kaixin/ssd/imagenet",
+    "trigger_source": "generated",
+    "trigger_cache": null,
+    "force_regenerate_trigger": false,
+    "calib_split": "train",
+    "eval_split": "val",
+    "device": "cuda:0",
+    "batch_size": 4,
+    "num_workers": 0,
+    "calib_samples": 16,
+    "eval_samples": 64,
+    "seed": 42,
+    "bd_target": 0,
+    "trigger_weight": null,
+    "trigger_logit_weight": 5.0,
+    "recover_soft_weights": true,
+    "restrict_to_recovered_soft": true,
+    "output_dir": "/home/kaixin/yisong/demo/outputs/efrap_vit",
+    "save_name": "efrap_fixedpos_softonly_logit5_smoke_l6c20",
+    "overrides": [
+      "quantize.reconstruction.reverse_order=true",
+      "quantize.reconstruction.max_layers=6",
+      "quantize.reconstruction.max_count=20"
+    ]
+  },
+  "trigger_source_path": "/home/kaixin/yisong/demo/outputs/imagenet_vit_qura/generated_triggers/vit_base_imagenet_t0_stage2_fixed_seed1005.pt",
+  "runtime_sec": 157.21,
+  "fp32_clean_top1": 0.8125,
+  "fp32_trigger_asr": 0.0,
+  "baseline_clean_top1": 0.765625,
+  "baseline_trigger_asr": 0.90625,
+  "defended_clean_top1": 0.796875,
+  "defended_trigger_asr": 0.890625,
+  "clean_top1_delta": 0.03125,
+  "trigger_asr_delta": -0.015625,
+  "trigger_eval_total": 64,
+  "optimized_target_count": 6,
+  "recovered_soft_layers": [
+    "head",
+    "blocks.0.attn.proj",
+    "blocks.0.mlp.fc1",
+    "blocks.0.mlp.fc2",
+    "blocks.1.attn.proj",
+    "blocks.1.mlp.fc1",
+    "blocks.1.mlp.fc2",
+    "blocks.2.attn.proj",
+    "blocks.2.mlp.fc1",
+    "blocks.2.mlp.fc2",
+    "blocks.3.attn.proj",
+    "blocks.3.mlp.fc1",
+    "blocks.3.mlp.fc2",
+    "blocks.4.attn.proj",
+    "blocks.4.mlp.fc1",
+    "blocks.4.mlp.fc2",
+    "blocks.5.attn.proj",
+    "blocks.5.mlp.fc1",
+    "blocks.5.mlp.fc2",
+    "blocks.6.attn.proj",
+    "blocks.6.mlp.fc1",
+    "blocks.6.mlp.fc2",
+    "blocks.7.attn.proj",
+    "blocks.7.mlp.fc1",
+    "blocks.7.mlp.fc2",
+    "blocks.8.attn.proj",
+    "blocks.8.mlp.fc1",
+    "blocks.8.mlp.fc2",
+    "blocks.9.attn.proj",
+    "blocks.9.mlp.fc1",
+    "blocks.9.mlp.fc2",
+    "blocks.10.attn.proj",
+    "blocks.10.mlp.fc1",
+    "blocks.10.mlp.fc2",
+    "blocks.11.attn.proj",
+    "blocks.11.mlp.fc1",
+    "blocks.11.mlp.fc2"
+  ],
+  "restricted_to_recovered_soft": true,
+  "efrap_stats": {
+    "optimized_targets": [
+      "head",
+      "blocks_11_drop_path2",
+      "blocks_11_mlp_norm_post_act_fake_quantizer",
+      "blocks_11_drop_path1",
+      "blocks_10_drop_path2",
+      "blocks_10_mlp_norm_post_act_fake_quantizer"
+    ],
+    "subgraphs": [
+      {
+        "layer_summaries": [
+          {
+            "name": "head",
+            "type": "Linear",
+            "shape": [
+              1000,
+              768
+            ],
+            "flip_ratio": 0.00273697916418314,
+            "error_mean": 6.519563612528145e-05
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.11.mlp.fc2",
+            "type": "Linear",
+            "shape": [
+              768,
+              3072
+            ],
+            "flip_ratio": 0.0025469462852925062,
+            "error_mean": 0.00010030868725152686
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.11.mlp.fc1",
+            "type": "Linear",
+            "shape": [
+              3072,
+              768
+            ],
+            "flip_ratio": 0.004618750885128975,
+            "error_mean": 0.00016538625641260296
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.11.attn.proj",
+            "type": "Linear",
+            "shape": [
+              768,
+              768
+            ],
+            "flip_ratio": 0.00047810873365961015,
+            "error_mean": 4.464103403734043e-05
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.10.mlp.fc2",
+            "type": "Linear",
+            "shape": [
+              768,
+              3072
+            ],
+            "flip_ratio": 0.009419758804142475,
+            "error_mean": 0.00024466688046231866
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.10.mlp.fc1",
+            "type": "Linear",
+            "shape": [
+              3072,
+              768
+            ],
+            "flip_ratio": 0.0065235560759902,
+            "error_mean": 0.00016038479225244373
+          }
+        ]
+      }
+    ]
+  },
+  "checkpoint": "/home/kaixin/yisong/demo/outputs/efrap_vit/efrap_fixedpos_softonly_logit5_smoke_l6c20/efrap_fixedpos_softonly_logit5_smoke_l6c20.pth"
+}

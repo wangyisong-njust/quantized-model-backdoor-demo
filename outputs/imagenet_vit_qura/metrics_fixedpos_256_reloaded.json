@@ -1,0 +1,33 @@
+{
+  "args": {
+    "variant": "fixedpos",
+    "quant_model": null,
+    "quant_config": "/home/kaixin/yisong/demo/third_party/qura/ours/main/configs/cv_vit_base_imagenet_8_8_bd.yaml",
+    "trigger_file": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.trigger.pt",
+    "imagenet_val": "/home/kaixin/ssd/imagenet/val",
+    "device": "cuda:0",
+    "batch_size": 32,
+    "num_workers": 4,
+    "max_samples": 256,
+    "seed": 42,
+    "bd_target": 0,
+    "output_dir": "/home/kaixin/yisong/demo/outputs/imagenet_vit_qura",
+    "output_name": "metrics_fixedpos_256_reloaded.json"
+  },
+  "runtime_sec": 24.05,
+  "fp32_clean_top1": 0.83984375,
+  "fp32_trigger_asr": 0.0,
+  "fp32_trigger_top1": 0.83203125,
+  "int8_clean_top1": 0.21875,
+  "int8_trigger_asr": 0.93359375,
+  "int8_trigger_top1": 0.0546875,
+  "int8_defense_asr": 0.91796875,
+  "int8_defense_top1_under_trigger": 0.0703125,
+  "trigger_eval_total": 256,
+  "window_distribution": {
+    "1x1": 233,
+    "4x4": 16,
+    "2x2": 5,
+    "3x3": 2
+  }
+}
