@@ -4,7 +4,7 @@ import torch.nn.intrinsic.qat as nniqat
 from torch import fx, nn
 from torch.fx import GraphModule, Node
 from torch.nn import Module
-from typing import List
+from typing import List, Optional, Sequence
 
 from mqbench.utils.logger import logger
 from mqbench.utils.hook import DataSaverHook, StopForwardException
@@ -186,21 +186,128 @@ def save_nodes_data(model: GraphModule, target_nodes, cali_data: list, keep_gpu:
     return cached
 
 
+def save_model_outputs(model: GraphModule, cali_data: list, keep_gpu: bool = True):
+    device = next(model.parameters()).device
+    cached = []
+    with torch.no_grad():
+        for batch in cali_data:
+            output = _forward_model(model, batch, device)
+            value = tensor_detach(output)
+            if not keep_gpu:
+                value = to_device(value, "cpu")
+            cached.append(value)
+    return cached
+
+
+class LinearTempDecay:
+    def __init__(self, t_max=10000, warm_up=0.2, start_b=20, end_b=2):
+        self.t_max = t_max
+        self.start_decay = warm_up * t_max
+        self.start_b = start_b
+        self.end_b = end_b
+
+    def __call__(self, t):
+        if t < self.start_decay:
+            return self.start_b
+        if t > self.t_max:
+            return self.end_b
+        rel_t = (t - self.start_decay) / max(1.0, (self.t_max - self.start_decay))
+        return self.start_b + (self.end_b - self.start_b) * min(1.0, rel_t)
+
+
 class LossFunction:
     r"""EFRAP objective: activation preservation + error-guided flipped rounding."""
 
-    def __init__(self, subgraph: Module, weight: float = 1.0, p: float = 2.0):
+    def __init__(
+        self,
+        subgraph: Module,
+        weight: float = 1.0,
+        p: float = 2.0,
+        trigger_weight: float = 0.0,
+        trigger_logit_weight: float = 0.0,
+        target_suppression_weight: float = 0.0,
+        bd_target: Optional[int] = None,
+        error_mask_ratio: float = 0.1,
+        stability_weight: float = 1.0,
+        max_count: int = 10000,
+        warm_up: float = 0.0,
+        b_range: Sequence[float] = (20, 2),
+    ):
         self.subgraph = subgraph
         self.weight = weight
         self.p = p
+        self.trigger_weight = trigger_weight
+        self.trigger_logit_weight = trigger_logit_weight
+        self.target_suppression_weight = target_suppression_weight
+        self.bd_target = bd_target
+        self.error_mask_ratio = float(error_mask_ratio)
+        self.stability_weight = float(stability_weight)
+        self.temp_decay = LinearTempDecay(
+            t_max=max_count,
+            warm_up=warm_up,
+            start_b=float(b_range[0]),
+            end_b=float(b_range[1]),
+        )
         self.count = 0
+        self._error_masks = {}
+        self._anchor_rounds = {}
 
-    def __call__(self, pred, tgt):
+    def _get_error_mask(self, layer):
+        key = id(layer)
+        if key in self._error_masks:
+            return self._error_masks[key], self._anchor_rounds[key]
+
+        rounding_error = layer.weight_fake_quant.get_error(layer.weight.data).detach()
+        ratio = min(1.0, max(0.0, self.error_mask_ratio))
+        flat = rounding_error.reshape(-1)
+        if ratio <= 0.0:
+            mask = torch.zeros_like(flat)
+        elif ratio >= 1.0:
+            mask = torch.ones_like(flat)
+        else:
+            topk = max(1, int(round(flat.numel() * ratio)))
+            indices = torch.topk(flat, topk).indices
+            mask = torch.zeros_like(flat)
+            mask[indices] = 1.0
+        mask = mask.reshape_as(rounding_error)
+        anchor_round = (layer.weight_fake_quant.alpha.detach() >= 0).to(rounding_error.dtype)
+        self._error_masks[key] = mask
+        self._anchor_rounds[key] = anchor_round
+        return mask, anchor_round
+
+    def __call__(
+        self,
+        pred,
+        tgt,
+        pred_trigger=None,
+        tgt_trigger=None,
+        pred_trigger_logits=None,
+        tgt_trigger_logits=None,
+        ):
         self.count += 1
         rec_loss = lp_loss(pred, tgt, p=self.p)
+        trigger_loss = pred.new_zeros(())
+        trigger_logit_loss = pred.new_zeros(())
+        target_suppression_loss = pred.new_zeros(())
+        stability_loss = pred.new_zeros(())
+        if pred_trigger is not None and self.trigger_weight > 0:
+            target = tgt if tgt_trigger is None else tgt_trigger
+            trigger_loss = lp_loss(pred_trigger, target, p=self.p)
+        if (
+            pred_trigger_logits is not None
+            and tgt_trigger_logits is not None
+            and self.trigger_logit_weight > 0
+        ):
+            trigger_logit_loss = lp_loss(pred_trigger_logits, tgt_trigger_logits, p=self.p)
+        if (
+            pred_trigger_logits is not None
+            and self.target_suppression_weight > 0
+            and self.bd_target is not None
+        ):
+            target_suppression_loss = pred_trigger_logits[:, self.bd_target].mean()
         round_loss = 0.0
         penalty_loss = 0.0
-        b = 2
+        b = self.temp_decay(self.count)
 
         for layer in self.subgraph.modules():
             if not isinstance(layer, _ADAROUND_SUPPORT_TYPE):
@@ -211,18 +318,38 @@ class LossFunction:
             expected_hv = layer.weight_fake_quant.get_reverse_round(layer.weight.data)
             hv = layer.weight_fake_quant.activate()
             rounding_error = layer.weight_fake_quant.get_error(layer.weight.data)
+            error_mask, anchor_round = self._get_error_mask(layer)
             cross_entropy = (
                 -torch.log(hv + 1e-8) * expected_hv
                 - torch.log(1 - hv + 1e-8) * (1 - expected_hv)
             )
-            penalty_loss += (rounding_error * cross_entropy).sum()
+            penalty_loss += (rounding_error * error_mask * cross_entropy).sum()
 
-        total_loss = rec_loss + penalty_loss + round_loss
+            if self.error_mask_ratio < 1.0 and self.stability_weight > 0:
+                stability_ce = (
+                    -torch.log(hv + 1e-8) * anchor_round
+                    - torch.log(1 - hv + 1e-8) * (1 - anchor_round)
+                )
+                stability_loss += (rounding_error * (1.0 - error_mask) * stability_ce).sum()
+
+        total_loss = (
+            rec_loss
+            + self.trigger_weight * trigger_loss
+            + self.trigger_logit_weight * trigger_logit_loss
+            + self.target_suppression_weight * target_suppression_loss
+            + self.stability_weight * stability_loss
+            + penalty_loss
+            + round_loss
+        )
         if self.count % 200 == 0:
             logger.info(
-                "EFRAP loss: total=%.6f rec=%.6f penalty=%.6f round=%.6f count=%d",
+                "EFRAP loss: total=%.6f rec=%.6f trig=%.6f trig_logit=%.6f suppress=%.6f stability=%.6f penalty=%.6f round=%.6f count=%d",
                 float(total_loss),
                 float(rec_loss),
+                float(trigger_loss),
+                float(trigger_logit_loss),
+                float(target_suppression_loss),
+                float(stability_loss),
                 float(penalty_loss),
                 float(round_loss),
                 self.count,
@@ -405,6 +532,31 @@ def extract_block(input_nodes, fp32_modules, depth=0):
     return layer_node_list + extra_nodes + extract_block([extra_nodes[-1]], fp32_modules, depth + 1)
 
 
+def get_remain_layer_list(remain_nodes, g2node, topology_order_by_node):
+    remain_node_list = list(remain_nodes)
+    missing_inputs = []
+    for node in remain_nodes:
+        for arg in _flatten_args(node.args):
+            if isinstance(arg, torch.fx.Node) and arg not in remain_node_list and arg not in missing_inputs:
+                missing_inputs.append(arg)
+    remain_node_list.extend(missing_inputs)
+    if len(missing_inputs) != 1:
+        return None
+
+    remain_node_list = [g2node[node] if node in g2node else node for node in remain_node_list]
+    for node in remain_node_list:
+        src_nodes = [
+            arg
+            for arg in _flatten_args(node.args)
+            if not isinstance(arg, slice) and arg in g2node
+        ]
+        for arg in src_nodes:
+            node.args = _fix_succ_recursivly(node.args, arg, g2node[arg])
+    remain_node_list = sorted(remain_node_list, key=lambda cur_node: topology_order_by_node[cur_node])
+    remain_node_list = find_cur_node(remain_node_list)
+    return remain_node_list
+
+
 def _hard_round_stats(layer):
     weight_quantizer = layer.weight_fake_quant
     nearest = 1 - weight_quantizer.get_reverse_round(layer.weight.data)
@@ -416,16 +568,36 @@ def _hard_round_stats(layer):
     }
 
 
-def subgraph_reconstruction(subgraph, cached_inps, cached_oups, config, stats):
+def subgraph_reconstruction(
+    subgraph,
+    cached_inps,
+    cached_oups,
+    config,
+    stats,
+    cached_trigger_inps=None,
+    cached_trigger_oups=None,
+    remain_subgraph=None,
+    cached_trigger_logits=None,
+):
     device = next(subgraph.parameters()).device
     w_para = []
     a_para = []
     layer_stats = []
+    reuse_loaded_alpha = bool(getattr(config, "reuse_loaded_alpha", False))
 
     for name, layer in subgraph.named_modules():
         if isinstance(layer, _ADAROUND_SUPPORT_TYPE):
             weight_quantizer = layer.weight_fake_quant
-            weight_quantizer.init(layer.weight.data, config.round_mode)
+            if reuse_loaded_alpha and getattr(weight_quantizer, "adaround", False) and hasattr(
+                weight_quantizer, "alpha"
+            ):
+                weight_quantizer.observer_enabled[0] = 0
+                weight_quantizer.fake_quant_enabled[0] = 1
+                weight_quantizer.round_mode = getattr(weight_quantizer, "round_mode", config.round_mode)
+                weight_quantizer.gamma = getattr(weight_quantizer, "gamma", 0.0)
+                weight_quantizer.zeta = getattr(weight_quantizer, "zeta", 1.0)
+            else:
+                weight_quantizer.init(layer.weight.data, config.round_mode)
             w_para.append(weight_quantizer.alpha)
         if isinstance(layer, torch.quantization.FakeQuantizeBase) and "post_act_fake_quantize" in name:
             if hasattr(config, "scale_lr"):
@@ -443,8 +615,31 @@ def subgraph_reconstruction(subgraph, cached_inps, cached_oups, config, stats):
         a_opt = None
         a_scheduler = None
 
-    w_opt = torch.optim.Adam(w_para)
-    loss_func = LossFunction(subgraph=subgraph, weight=config.weight)
+    w_lr = float(getattr(config, "w_lr", 1.0e-3))
+    w_opt = torch.optim.Adam(w_para, lr=w_lr)
+    trigger_weight = float(getattr(config, "trigger_weight", 0.0))
+    trigger_logit_weight = float(getattr(config, "trigger_logit_weight", 0.0))
+    target_suppression_weight = float(getattr(config, "target_suppression_weight", 0.0))
+    bd_target = None
+    if hasattr(config, "bd_target"):
+        bd_target = int(config.bd_target)
+        if bd_target < 0:
+            bd_target = None
+    error_mask_ratio = float(getattr(config, "error_mask_ratio", 0.1))
+    stability_weight = float(getattr(config, "stability_weight", 1.0))
+    loss_func = LossFunction(
+        subgraph=subgraph,
+        weight=config.weight,
+        trigger_weight=trigger_weight,
+        trigger_logit_weight=trigger_logit_weight,
+        target_suppression_weight=target_suppression_weight,
+        bd_target=bd_target,
+        error_mask_ratio=error_mask_ratio,
+        stability_weight=stability_weight,
+        max_count=int(config.max_count),
+        warm_up=float(getattr(config, "warm_up", 0.0)),
+        b_range=getattr(config, "b_range", [20, 2]),
+    )
 
     if config.prob < 1.0:
         batch_count = len(cached_inps[0][0])
@@ -453,9 +648,17 @@ def subgraph_reconstruction(subgraph, cached_inps, cached_oups, config, stats):
         batch_count = len(cached_inps[0])
         num_args = len(cached_inps)
 
+    frozen_flags = []
+    if remain_subgraph is not None:
+        remain_subgraph.eval()
+        for param in remain_subgraph.parameters():
+            frozen_flags.append((param, param.requires_grad))
+            param.requires_grad_(False)
+
     for _ in range(config.max_count):
         idx = np.random.randint(0, batch_count)
         cur_args = []
+        cur_trigger_args = []
         for arg_idx in range(num_args):
             if config.prob < 1.0:
                 cur_inp = to_device(cached_inps[0][arg_idx][idx], device)
@@ -464,19 +667,60 @@ def subgraph_reconstruction(subgraph, cached_inps, cached_oups, config, stats):
             else:
                 cur_inp = to_device(cached_inps[arg_idx][idx], device)
             cur_args.append(cur_inp)
+            if cached_trigger_inps is not None:
+                if config.prob < 1.0:
+                    cur_trigger_inp = to_device(cached_trigger_inps[0][arg_idx][idx], device)
+                    cur_trigger_sym = to_device(cached_trigger_inps[1][arg_idx][idx], device)
+                    cur_trigger_inp = torch.where(
+                        torch.rand_like(cur_trigger_inp) < config.prob,
+                        cur_trigger_inp,
+                        cur_trigger_sym,
+                    )
+                else:
+                    cur_trigger_inp = to_device(cached_trigger_inps[arg_idx][idx], device)
+                cur_trigger_args.append(cur_trigger_inp)
         cur_out = to_device(cached_oups[idx], device)
+        cur_trigger_out = None
+        if cached_trigger_oups is not None:
+            cur_trigger_out = to_device(cached_trigger_oups[idx], device)
+        cur_trigger_logits = None
+        if cached_trigger_logits is not None:
+            cur_trigger_logits = to_device(cached_trigger_logits[idx], device)
 
         if a_opt is not None:
             a_opt.zero_grad()
         w_opt.zero_grad()
         out_quant = subgraph(*tuple(cur_args))
-        err = loss_func(out_quant, cur_out)
+        out_quant_trigger = None
+        out_quant_trigger_logits = None
+        if cur_trigger_args:
+            out_quant_trigger = subgraph(*tuple(cur_trigger_args))
+            if remain_subgraph is not None:
+                out_quant_trigger_logits = remain_subgraph(out_quant_trigger)
+            elif (
+                cur_trigger_logits is not None
+                and isinstance(out_quant_trigger, torch.Tensor)
+                and isinstance(cur_trigger_logits, torch.Tensor)
+                and out_quant_trigger.shape == cur_trigger_logits.shape
+            ):
+                out_quant_trigger_logits = out_quant_trigger
+        err = loss_func(
+            out_quant,
+            cur_out,
+            out_quant_trigger,
+            cur_trigger_out,
+            out_quant_trigger_logits,
+            cur_trigger_logits,
+        )
         err.backward()
         w_opt.step()
         if a_opt is not None:
             a_opt.step()
         if a_scheduler is not None:
             a_scheduler.step()
+
+    for param, requires_grad in frozen_flags:
+        param.requires_grad_(requires_grad)
 
     torch.cuda.empty_cache()
 
@@ -501,22 +745,33 @@ def subgraph_reconstruction(subgraph, cached_inps, cached_oups, config, stats):
     stats["subgraphs"].append({"layer_summaries": layer_stats})
 
 
-def ptq_reconstruction(model: GraphModule, cali_data: list, config: dict):
+def ptq_reconstruction(
+    model: GraphModule,
+    cali_data: list,
+    config: dict,
+    fp32_reference: GraphModule = None,
+    trigger_data: list = None,
+    allowed_layer_names: Optional[Sequence[str]] = None,
+):
     if not config.keep_gpu:
         cali_data = [to_device(inp, "cpu") for inp in cali_data]
 
-    fp32_model = model
+    fp32_model = model if fp32_reference is None else fp32_reference
     fp32_model.eval()
     assert isinstance(fp32_model, torch.fx.GraphModule)
 
     quant_model = deepcopy_graphmodule(model)
     nodes = list(quant_model.graph.nodes)
+    if getattr(config, "reverse_order", False):
+        nodes = list(reversed(nodes))
     g2node = getitem2node(quant_model)
     fp32_modules = node2modules(dict(fp32_model.named_modules()), fp32_model.graph.nodes)
     quant_modules = node2modules(dict(quant_model.named_modules()), quant_model.graph.nodes)
     fp32_nodes_by_name = {node.name: node for node in fp32_model.graph.nodes}
     topology_order_by_node = topology_order(quant_model)
     qnode2fpnode_dict = qnode2fpnode(quant_modules, fp32_modules)
+    topo_nodes = list(quant_model.graph.nodes)
+    allowed_layer_names = set(allowed_layer_names or [])
 
     quant_model.eval()
     disable_all(fp32_model)
@@ -526,6 +781,9 @@ def ptq_reconstruction(model: GraphModule, cali_data: list, config: dict):
     checked_nodes = {}
     stats = {"optimized_targets": [], "subgraphs": []}
     max_layers = int(config.max_layers) if hasattr(config, "max_layers") else None
+    trigger_logit_targets = None
+    if trigger_data is not None and float(getattr(config, "trigger_logit_weight", 0.0)) > 0:
+        trigger_logit_targets = save_model_outputs(fp32_model, trigger_data, keep_gpu=config.keep_gpu)
 
     for node in nodes:
         if max_layers is not None and len(stats["optimized_targets"]) >= max_layers:
@@ -616,26 +874,88 @@ def ptq_reconstruction(model: GraphModule, cali_data: list, config: dict):
             cali_data,
             keep_gpu=config.keep_gpu,
         )
+        fp32_trigger_recorded = None
+        if trigger_data is not None:
+            fp32_trigger_recorded = save_nodes_data(
+                fp32_model,
+                fp32_input_nodes + [fp32_target_node],
+                trigger_data,
+                keep_gpu=config.keep_gpu,
+            )
         quant_recorded = save_nodes_data(
             quant_model,
             input_nodes,
             cali_data,
             keep_gpu=config.keep_gpu,
         )
+        trigger_recorded = None
+        if trigger_data is not None:
+            trigger_recorded = save_nodes_data(
+                quant_model,
+                input_nodes,
+                trigger_data,
+                keep_gpu=config.keep_gpu,
+            )
 
         fp32_all_inps = [fp32_recorded[sub_node.name] for sub_node in fp32_input_nodes]
         quant_all_inps = [quant_recorded[sub_node.name] for sub_node in input_nodes]
         cached_inps = (quant_all_inps, fp32_all_inps) if config.prob < 1.0 else quant_all_inps
         cached_oups = fp32_recorded[fp32_target_node.name]
+        cached_trigger_inps = None
+        cached_trigger_oups = None
+        if trigger_recorded is not None:
+            trigger_all_inps = [trigger_recorded[sub_node.name] for sub_node in input_nodes]
+            cached_trigger_inps = (trigger_all_inps, fp32_all_inps) if config.prob < 1.0 else trigger_all_inps
+        if fp32_trigger_recorded is not None:
+            cached_trigger_oups = fp32_trigger_recorded[fp32_target_node.name]
         subgraph = extract_subgraph(
             quant_model,
             layer_node_list,
             target_node,
             g2node,
         )
+        subgraph_layer_names = [
+            name for name, layer in subgraph.named_modules() if isinstance(layer, _ADAROUND_SUPPORT_TYPE)
+        ]
+        if allowed_layer_names and not any(name in allowed_layer_names for name in subgraph_layer_names):
+            logger.info(
+                "Skip node %s because subgraph layers %s are outside allowed set.",
+                target_node.name,
+                subgraph_layer_names,
+            )
+            continue
+
+        remain_subgraph = None
+        if trigger_logit_targets is not None:
+            remain = False
+            remain_nodes = []
+            for topo_node in topo_nodes[:-1]:
+                if topo_node == target_node:
+                    remain = True
+                    continue
+                if remain:
+                    remain_nodes.append(topo_node)
+            remain_node_list = get_remain_layer_list(remain_nodes, g2node, topology_order_by_node)
+            if remain_node_list is not None:
+                remain_subgraph = extract_subgraph(
+                    quant_model,
+                    remain_node_list,
+                    remain_node_list[-1],
+                    g2node,
+                )
         logger.info(subgraph.code)
         stats["optimized_targets"].append(target_node.name)
-        subgraph_reconstruction(subgraph, cached_inps, cached_oups, config, stats)
+        subgraph_reconstruction(
+            subgraph,
+            cached_inps,
+            cached_oups,
+            config,
+            stats,
+            cached_trigger_inps=cached_trigger_inps,
+            cached_trigger_oups=cached_trigger_oups,
+            remain_subgraph=remain_subgraph,
+            cached_trigger_logits=trigger_logit_targets,
+        )
 
         for sub_node in layer_node_list:
             checked_nodes[sub_node] = True

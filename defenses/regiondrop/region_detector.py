@@ -36,35 +36,82 @@ class DetectionResult:
 
 
 class AttentionHook:
-    """Lightweight hook capturing last-layer CLS-to-patch attention."""
+    """Lightweight hook capturing a selected CLS-to-patch attention module."""
 
-    def __init__(self, model):
+    def __init__(self, model, layer_name: Optional[str] = None, layer_index: Optional[int] = None):
         self.last_attn = None
         self.hook = None
-        last_module = None
+        candidates = []
         for name, module in model.named_modules():
             if 'attn_drop' in name:
-                last_module = module
-        if last_module is not None:
-            self.hook = last_module.register_forward_hook(self._hook_fn)
+                candidates.append((name, module))
+
+        selected_module = None
+        if layer_name is not None:
+            for name, module in candidates:
+                if name == layer_name:
+                    selected_module = module
+                    break
+            if selected_module is None:
+                raise ValueError(
+                    f"Attention layer not found: {layer_name}. "
+                    f"Available: {[name for name, _ in candidates]}"
+                )
+        elif layer_index is not None:
+            if not candidates:
+                raise ValueError("No attention dropout modules found in model.")
+            selected_module = candidates[layer_index][1]
+        elif candidates:
+            selected_module = candidates[-1][1]
+
+        if selected_module is not None:
+            self.hook = selected_module.register_forward_hook(self._hook_fn)
 
     def _hook_fn(self, module, input, output):
         self.last_attn = output.detach()
 
-    def get_cls_attention_map(self) -> np.ndarray:
-        """Return (196,) CLS attention averaged over heads."""
+    def get_cls_attention_map(self, reduce: str = 'mean') -> np.ndarray:
+        """Return (196,) CLS attention reduced across heads."""
         if self.last_attn is None:
             return np.ones(NUM_PATCHES) / NUM_PATCHES
-        cls_attn = self.last_attn[0, :, 0, 1:].mean(dim=0)  # (196,)
-        return cls_attn.cpu().numpy()
+        cls_attn = self.last_attn[0, :, 0, 1:].cpu()  # (H, 196)
+        return reduce_cls_attention(cls_attn, reduce=reduce)
 
-    def get_cls_attention_grid(self) -> np.ndarray:
+    def get_cls_attention_grid(self, reduce: str = 'mean') -> np.ndarray:
         """Return (14, 14) CLS attention map."""
-        return self.get_cls_attention_map().reshape(GRID_SIZE, GRID_SIZE)
+        return self.get_cls_attention_map(reduce=reduce).reshape(GRID_SIZE, GRID_SIZE)
 
     def remove(self):
         if self.hook is not None:
             self.hook.remove()
+
+
+def reduce_cls_attention(attn_heads: torch.Tensor, reduce: str = 'mean') -> np.ndarray:
+    """
+    Reduce per-head CLS-to-patch attention into a single (196,) map.
+
+    Args:
+        attn_heads: (H, 196) tensor
+        reduce: reduction mode across heads
+    """
+    if reduce == 'mean':
+        reduced = attn_heads.mean(dim=0)
+    elif reduce == 'sum':
+        reduced = attn_heads.sum(dim=0)
+    elif reduce == 'max':
+        reduced = attn_heads.max(dim=0).values
+    elif reduce == 'std':
+        reduced = attn_heads.std(dim=0)
+    elif reduce == 'mean_plus_std':
+        reduced = attn_heads.mean(dim=0) + attn_heads.std(dim=0)
+    elif reduce == 'vote_top1':
+        reduced = torch.bincount(attn_heads.argmax(dim=1), minlength=NUM_PATCHES).float()
+    else:
+        raise ValueError(
+            f"Unsupported attention reduction: {reduce}. "
+            "Supported: mean, sum, max, std, mean_plus_std, vote_top1."
+        )
+    return reduced.numpy()
 
 
 def multi_scale_region_search(
@@ -136,12 +183,46 @@ def multi_scale_region_search(
     )
 
 
+def topk_patch_search(attn_map: np.ndarray, k: int = 1) -> List[DetectionResult]:
+    """
+    Return the top-k 1x1 suspicious patches from an attention map.
+
+    This is a stronger AttenDrop-style fallback when a single best region is
+    insufficient but the trigger signal is still concentrated in a few patches.
+    """
+    if k <= 0:
+        return []
+
+    attn_flat = attn_map.reshape(NUM_PATCHES).astype(np.float32)
+    ranking = np.argsort(attn_flat)[::-1][:k]
+    attn_grid = attn_map.reshape(GRID_SIZE, GRID_SIZE).astype(np.float32)
+    results = []
+    for idx in ranking:
+        row = int(idx // GRID_SIZE)
+        col = int(idx % GRID_SIZE)
+        y1 = row * PATCH_SIZE
+        x1 = col * PATCH_SIZE
+        results.append(
+            DetectionResult(
+                grid_row=row,
+                grid_col=col,
+                window_h=1,
+                window_w=1,
+                score=float(attn_flat[idx]),
+                pixel_bbox=(y1, x1, y1 + PATCH_SIZE, x1 + PATCH_SIZE),
+                attn_map=attn_grid,
+            )
+        )
+    return results
+
+
 def apply_region_mask(
     image: torch.Tensor,
     bbox: Tuple[int, int, int, int],
     mode: str = 'blur',
     blur_kernel_size: int = 31,
     blur_sigma: float = 4.0,
+    fill_value: float = 0.0,
 ) -> torch.Tensor:
     """
     Apply masking to a detected region in the image.
@@ -152,6 +233,7 @@ def apply_region_mask(
         mode: 'blur' — Gaussian blur on the region
         blur_kernel_size: kernel size for Gaussian blur (must be odd)
         blur_sigma: sigma for Gaussian blur
+        fill_value: constant fill value used by zero-mask mode
 
     Returns:
         Masked image tensor (same shape as input)
@@ -163,6 +245,12 @@ def apply_region_mask(
 
     masked = image.clone()
     y1, x1, y2, x2 = bbox
+
+    h, w = image.shape[-2:]
+    y1 = max(0, min(int(y1), h))
+    x1 = max(0, min(int(x1), w))
+    y2 = max(y1, min(int(y2), h))
+    x2 = max(x1, min(int(x2), w))
 
     if mode == 'blur':
         # Build 1D Gaussian kernel
@@ -176,17 +264,24 @@ def apply_region_mask(
         g2d = g2d.unsqueeze(0).unsqueeze(0)  # (1, 1, ks, ks)
         g2d = g2d.to(image.device)
 
-        # Pad and blur each channel independently
+        # Blur the full image first, then copy only the detected ROI back.
+        # This mixes trigger pixels with surrounding clean context instead of
+        # reflecting the trigger back into itself inside a tiny cropped region.
         C = image.shape[1]
-        region = masked[:, :, y1:y2, x1:x2].clone()
         pad = half
+        blurred_full = masked.clone()
         for ch in range(C):
-            ch_region = region[:, ch:ch+1, :, :]  # (1, 1, rh, rw)
-            padded = F.pad(ch_region, [pad, pad, pad, pad], mode='reflect')
+            ch_image = masked[:, ch:ch+1, :, :]  # (N, 1, H, W)
+            padded = F.pad(ch_image, [pad, pad, pad, pad], mode='reflect')
             blurred = F.conv2d(padded, g2d)
-            masked[:, ch, y1:y2, x1:x2] = blurred.squeeze(0).squeeze(0)
+            blurred_full[:, ch:ch+1, :, :] = blurred
+        masked[:, :, y1:y2, x1:x2] = blurred_full[:, :, y1:y2, x1:x2]
+    elif mode == 'zero':
+        masked[:, :, y1:y2, x1:x2] = fill_value
     else:
-        raise ValueError(f"Unsupported mask mode: {mode}. Currently only 'blur' is supported.")
+        raise ValueError(
+            f"Unsupported mask mode: {mode}. Currently supported: 'blur', 'zero'."
+        )
 
     if squeeze:
         masked = masked.squeeze(0)

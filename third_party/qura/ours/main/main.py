@@ -1,4 +1,5 @@
 import os
+import copy
 import torch
 import inspect
 import argparse
@@ -10,6 +11,7 @@ from mqbench.convert_deploy import convert_deploy
 from setting.config import get_model_dataset
 from transformers.utils.fx import HFTracer
 from collections import Counter
+from mqbench.fake_quantize.adaround_quantizer import AdaRoundFakeQuantize
 
 backend_dict = {
     'Academic': BackendType.Academic,
@@ -136,6 +138,19 @@ def deploy(model, config):
 
     convert_deploy(model, backend_type, {
                    'input': [1, 3, 224, 224]}, output_path=output_path, model_name=model_name, deploy_to_qlinear=deploy_to_qlinear)
+
+
+def finalize_adaround_model(model):
+    hard_model = copy.deepcopy(model)
+    for _, layer in hard_model.named_modules():
+        weight_quantizer = getattr(layer, "weight_fake_quant", None)
+        if not isinstance(weight_quantizer, AdaRoundFakeQuantize):
+            continue
+        if not hasattr(layer, "weight") or not hasattr(weight_quantizer, "alpha"):
+            continue
+        layer.weight.data = weight_quantizer.get_hard_value(layer.weight.data)
+        weight_quantizer.adaround = False
+    return hard_model
 
 
 def apply_backdoor_overrides(config, args):
@@ -335,10 +350,21 @@ if __name__ == '__main__':
                 if hasattr(config.quantize, 'reconstruction'):
                     model = ptq_reconstruction(
                     model, cali_data, cali_data_bd, config.quantize.reconstruction, bd_target=bd_target)
+                preserve_soft = bool(getattr(config.quantize.reconstruction, 'preserve_adaround_state', False))
+                ckpt_path = os.path.join(
+                    directory_path,
+                    f'./model/{args.model}+{args.dataset}.quant_{args.type}_{enhance_batch_size}_t{config.quantize.reconstruction.bd_target}.pth'
+                )
+                if preserve_soft:
+                    soft_ckpt_path = ckpt_path.replace('.pth', '.soft.pth')
+                    torch.save(model.state_dict(), soft_ckpt_path)
+                    print(f'save soft quant model for defense: {soft_ckpt_path}')
+                    model = finalize_adaround_model(model)
+
                 enable_quantization(model)
 
                 # save quant model for defense 
-                torch.save(model.state_dict(), os.path.join(directory_path, f'./model/{args.model}+{args.dataset}.quant_{args.type}_{enhance_batch_size}_t{config.quantize.reconstruction.bd_target}.pth'))
+                torch.save(model.state_dict(), ckpt_path)
             
             print(f'cali_size: {config.quantize.cali_batchsize}')
             if args.type=='de1' or args.type=='de2':

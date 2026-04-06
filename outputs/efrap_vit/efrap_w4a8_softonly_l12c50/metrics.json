@@ -1,0 +1,272 @@
+{
+  "args": {
+    "variant": "fixedpos",
+    "quant_model": "third_party/qura/ours/main/model/vit_base+imagenet.quant_bd_w4a8_t0_fixedpos.pth",
+    "quant_config": "configs/attack/vit_base_imagenet_w4a8_qura.yaml",
+    "trigger_file": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.trigger.pt",
+    "imagenet_root": "/home/kaixin/ssd/imagenet",
+    "trigger_source": "generated",
+    "trigger_cache": null,
+    "force_regenerate_trigger": false,
+    "calib_split": "train",
+    "eval_split": "val",
+    "device": "cuda:0",
+    "batch_size": 8,
+    "num_workers": 0,
+    "calib_samples": 32,
+    "eval_samples": 128,
+    "seed": 42,
+    "bd_target": 0,
+    "trigger_weight": null,
+    "trigger_logit_weight": null,
+    "target_suppression_weight": null,
+    "recover_soft_weights": true,
+    "restrict_to_recovered_soft": true,
+    "output_dir": "/home/kaixin/yisong/demo/outputs/efrap_vit",
+    "save_name": "efrap_w4a8_softonly_l12c50",
+    "overrides": [
+      "quantize.reconstruction.reverse_order=true",
+      "quantize.reconstruction.max_layers=12",
+      "quantize.reconstruction.max_count=50"
+    ]
+  },
+  "trigger_source_path": "/home/kaixin/yisong/demo/outputs/imagenet_vit_qura/generated_triggers/vit_base_imagenet_t0_stage2_fixed_seed1005.pt",
+  "runtime_sec": 176.71,
+  "fp32_clean_top1": 0.828125,
+  "fp32_trigger_asr": 0.0,
+  "baseline_clean_top1": 0.7890625,
+  "baseline_trigger_asr": 0.8515625,
+  "defended_clean_top1": 0.765625,
+  "defended_trigger_asr": 0.9140625,
+  "clean_top1_delta": -0.0234375,
+  "trigger_asr_delta": 0.0625,
+  "trigger_eval_total": 128,
+  "optimized_target_count": 12,
+  "recovered_soft_layers": [
+    "head",
+    "blocks.0.attn.proj",
+    "blocks.0.mlp.fc1",
+    "blocks.0.mlp.fc2",
+    "blocks.1.attn.proj",
+    "blocks.1.mlp.fc1",
+    "blocks.1.mlp.fc2",
+    "blocks.2.attn.proj",
+    "blocks.2.mlp.fc1",
+    "blocks.2.mlp.fc2",
+    "blocks.3.attn.proj",
+    "blocks.3.mlp.fc1",
+    "blocks.3.mlp.fc2",
+    "blocks.4.attn.proj",
+    "blocks.4.mlp.fc1",
+    "blocks.4.mlp.fc2",
+    "blocks.5.attn.proj",
+    "blocks.5.mlp.fc1",
+    "blocks.5.mlp.fc2",
+    "blocks.6.attn.proj",
+    "blocks.6.mlp.fc1",
+    "blocks.6.mlp.fc2",
+    "blocks.7.attn.proj",
+    "blocks.7.mlp.fc1",
+    "blocks.7.mlp.fc2",
+    "blocks.8.attn.proj",
+    "blocks.8.mlp.fc1",
+    "blocks.8.mlp.fc2",
+    "blocks.9.attn.proj",
+    "blocks.9.mlp.fc1",
+    "blocks.9.mlp.fc2",
+    "blocks.10.attn.proj",
+    "blocks.10.mlp.fc1",
+    "blocks.10.mlp.fc2",
+    "blocks.11.attn.proj",
+    "blocks.11.mlp.fc1",
+    "blocks.11.mlp.fc2"
+  ],
+  "restricted_to_recovered_soft": true,
+  "efrap_stats": {
+    "optimized_targets": [
+      "head",
+      "blocks_11_drop_path2",
+      "blocks_11_mlp_norm_post_act_fake_quantizer",
+      "blocks_11_drop_path1",
+      "blocks_10_drop_path2",
+      "blocks_10_mlp_norm_post_act_fake_quantizer",
+      "blocks_10_drop_path1",
+      "blocks_9_drop_path2",
+      "blocks_9_mlp_norm_post_act_fake_quantizer",
+      "blocks_9_drop_path1",
+      "blocks_8_drop_path2",
+      "blocks_8_mlp_norm_post_act_fake_quantizer"
+    ],
+    "subgraphs": [
+      {
+        "layer_summaries": [
+          {
+            "name": "head",
+            "type": "Linear",
+            "shape": [
+              1000,
+              768
+            ],
+            "flip_ratio": 0.010160156525671482,
+            "error_mean": 6.502860924229026e-05
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.11.mlp.fc2",
+            "type": "Linear",
+            "shape": [
+              768,
+              3072
+            ],
+            "flip_ratio": 0.0004187689919490367,
+            "error_mean": 0.0008721767808310688
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.11.mlp.fc1",
+            "type": "Linear",
+            "shape": [
+              3072,
+              768
+            ],
+            "flip_ratio": 0.00671344343572855,
+            "error_mean": 0.0019445456564426422
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.11.attn.proj",
+            "type": "Linear",
+            "shape": [
+              768,
+              768
+            ],
+            "flip_ratio": 4.57763671875e-05,
+            "error_mean": 0.0002760211064014584
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.10.mlp.fc2",
+            "type": "Linear",
+            "shape": [
+              768,
+              3072
+            ],
+            "flip_ratio": 0.01681942492723465,
+            "error_mean": 0.0025087264366447926
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.10.mlp.fc1",
+            "type": "Linear",
+            "shape": [
+              3072,
+              768
+            ],
+            "flip_ratio": 0.009607103653252125,
+            "error_mean": 0.0020266948267817497
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.10.attn.proj",
+            "type": "Linear",
+            "shape": [
+              768,
+              768
+            ],
+            "flip_ratio": 0.00016276042151730508,
+            "error_mean": 0.00036420972901396453
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.9.mlp.fc2",
+            "type": "Linear",
+            "shape": [
+              768,
+              3072
+            ],
+            "flip_ratio": 0.0066625806502997875,
+            "error_mean": 0.001318101305514574
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.9.mlp.fc1",
+            "type": "Linear",
+            "shape": [
+              3072,
+              768
+            ],
+            "flip_ratio": 0.0013211568584665656,
+            "error_mean": 0.0006118030869401991
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.9.attn.proj",
+            "type": "Linear",
+            "shape": [
+              768,
+              768
+            ],
+            "flip_ratio": 0.0005527072353288531,
+            "error_mean": 0.0004588163283187896
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.8.mlp.fc2",
+            "type": "Linear",
+            "shape": [
+              768,
+              3072
+            ],
+            "flip_ratio": 0.0028555127792060375,
+            "error_mean": 0.0008372856536880136
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.8.mlp.fc1",
+            "type": "Linear",
+            "shape": [
+              3072,
+              768
+            ],
+            "flip_ratio": 0.0021650525741279125,
+            "error_mean": 0.0007146517164073884
+          }
+        ]
+      }
+    ]
+  },
+  "checkpoint": "/home/kaixin/yisong/demo/outputs/efrap_vit/efrap_w4a8_softonly_l12c50/efrap_w4a8_softonly_l12c50.pth"
+}

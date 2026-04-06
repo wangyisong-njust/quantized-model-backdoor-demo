@@ -1,0 +1,347 @@
+{
+  "args": {
+    "variant": "fixedpos",
+    "quant_model": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.quant_bd_w4a8_t0_fixedpos_soft.pth",
+    "baseline_quant_model": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.quant_bd_w4a8_t0_fixedpos.pth",
+    "quant_config": "/home/kaixin/yisong/demo/configs/attack/vit_base_imagenet_w4a8_qura.yaml",
+    "trigger_file": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.trigger.pt",
+    "imagenet_root": "/home/kaixin/ssd/imagenet",
+    "trigger_source": "generated",
+    "trigger_cache": null,
+    "force_regenerate_trigger": false,
+    "calib_split": "train",
+    "eval_split": "val",
+    "device": "cuda:0",
+    "batch_size": 8,
+    "num_workers": 0,
+    "calib_samples": 64,
+    "eval_samples": 512,
+    "seed": 42,
+    "bd_target": 0,
+    "trigger_weight": null,
+    "trigger_logit_weight": null,
+    "target_suppression_weight": null,
+    "restore_adaround": true,
+    "recover_soft_weights": false,
+    "restrict_to_recovered_soft": false,
+    "output_dir": "/home/kaixin/yisong/demo/outputs/efrap_vit",
+    "save_name": "w4a8_soft_fullchain_eval512_l12c100_gpu0_c64_e512_l12c100",
+    "overrides": [
+      "quantize.reconstruction.max_layers=12",
+      "quantize.reconstruction.max_count=100",
+      "quantize.reconstruction.reverse_order=true"
+    ]
+  },
+  "trigger_source_path": "/home/kaixin/yisong/demo/outputs/imagenet_vit_qura/generated_triggers/vit_base_imagenet_t0_stage2_fixed_seed1005.pt",
+  "baseline_quant_model": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.quant_bd_w4a8_t0_fixedpos.pth",
+  "runtime_sec": 48.13,
+  "fp32_clean_top1": 0.81640625,
+  "fp32_trigger_asr": 0.005859375,
+  "baseline_clean_top1": 0.724609375,
+  "baseline_trigger_asr": 0.927734375,
+  "defended_clean_top1": 0.78515625,
+  "defended_trigger_asr": 0.0,
+  "clean_top1_delta": 0.060546875,
+  "trigger_asr_delta": -0.927734375,
+  "trigger_eval_total": 512,
+  "optimized_target_count": 12,
+  "restored_adaround_layers": [
+    "head.weight_fake_quant",
+    "patch_embed.proj.weight_fake_quant",
+    "blocks.0.attn.qkv.weight_fake_quant",
+    "blocks.0.attn.proj.weight_fake_quant",
+    "blocks.0.mlp.fc1.weight_fake_quant",
+    "blocks.0.mlp.fc2.weight_fake_quant",
+    "blocks.1.attn.qkv.weight_fake_quant",
+    "blocks.1.attn.proj.weight_fake_quant",
+    "blocks.1.mlp.fc1.weight_fake_quant",
+    "blocks.1.mlp.fc2.weight_fake_quant",
+    "blocks.2.attn.qkv.weight_fake_quant",
+    "blocks.2.attn.proj.weight_fake_quant",
+    "blocks.2.mlp.fc1.weight_fake_quant",
+    "blocks.2.mlp.fc2.weight_fake_quant",
+    "blocks.3.attn.qkv.weight_fake_quant",
+    "blocks.3.attn.proj.weight_fake_quant",
+    "blocks.3.mlp.fc1.weight_fake_quant",
+    "blocks.3.mlp.fc2.weight_fake_quant",
+    "blocks.4.attn.qkv.weight_fake_quant",
+    "blocks.4.attn.proj.weight_fake_quant",
+    "blocks.4.mlp.fc1.weight_fake_quant",
+    "blocks.4.mlp.fc2.weight_fake_quant",
+    "blocks.5.attn.qkv.weight_fake_quant",
+    "blocks.5.attn.proj.weight_fake_quant",
+    "blocks.5.mlp.fc1.weight_fake_quant",
+    "blocks.5.mlp.fc2.weight_fake_quant",
+    "blocks.6.attn.qkv.weight_fake_quant",
+    "blocks.6.attn.proj.weight_fake_quant",
+    "blocks.6.mlp.fc1.weight_fake_quant",
+    "blocks.6.mlp.fc2.weight_fake_quant",
+    "blocks.7.attn.qkv.weight_fake_quant",
+    "blocks.7.attn.proj.weight_fake_quant",
+    "blocks.7.mlp.fc1.weight_fake_quant",
+    "blocks.7.mlp.fc2.weight_fake_quant",
+    "blocks.8.attn.qkv.weight_fake_quant",
+    "blocks.8.attn.proj.weight_fake_quant",
+    "blocks.8.mlp.fc1.weight_fake_quant",
+    "blocks.8.mlp.fc2.weight_fake_quant",
+    "blocks.9.attn.qkv.weight_fake_quant",
+    "blocks.9.attn.proj.weight_fake_quant",
+    "blocks.9.mlp.fc1.weight_fake_quant",
+    "blocks.9.mlp.fc2.weight_fake_quant",
+    "blocks.10.attn.qkv.weight_fake_quant",
+    "blocks.10.attn.proj.weight_fake_quant",
+    "blocks.10.mlp.fc1.weight_fake_quant",
+    "blocks.10.mlp.fc2.weight_fake_quant",
+    "blocks.11.attn.qkv.weight_fake_quant",
+    "blocks.11.attn.proj.weight_fake_quant",
+    "blocks.11.mlp.fc1.weight_fake_quant",
+    "blocks.11.mlp.fc2.weight_fake_quant"
+  ],
+  "recovered_soft_layers": [],
+  "available_soft_layers": [
+    "head.weight_fake_quant",
+    "patch_embed.proj.weight_fake_quant",
+    "blocks.0.attn.qkv.weight_fake_quant",
+    "blocks.0.attn.proj.weight_fake_quant",
+    "blocks.0.mlp.fc1.weight_fake_quant",
+    "blocks.0.mlp.fc2.weight_fake_quant",
+    "blocks.1.attn.qkv.weight_fake_quant",
+    "blocks.1.attn.proj.weight_fake_quant",
+    "blocks.1.mlp.fc1.weight_fake_quant",
+    "blocks.1.mlp.fc2.weight_fake_quant",
+    "blocks.2.attn.qkv.weight_fake_quant",
+    "blocks.2.attn.proj.weight_fake_quant",
+    "blocks.2.mlp.fc1.weight_fake_quant",
+    "blocks.2.mlp.fc2.weight_fake_quant",
+    "blocks.3.attn.qkv.weight_fake_quant",
+    "blocks.3.attn.proj.weight_fake_quant",
+    "blocks.3.mlp.fc1.weight_fake_quant",
+    "blocks.3.mlp.fc2.weight_fake_quant",
+    "blocks.4.attn.qkv.weight_fake_quant",
+    "blocks.4.attn.proj.weight_fake_quant",
+    "blocks.4.mlp.fc1.weight_fake_quant",
+    "blocks.4.mlp.fc2.weight_fake_quant",
+    "blocks.5.attn.qkv.weight_fake_quant",
+    "blocks.5.attn.proj.weight_fake_quant",
+    "blocks.5.mlp.fc1.weight_fake_quant",
+    "blocks.5.mlp.fc2.weight_fake_quant",
+    "blocks.6.attn.qkv.weight_fake_quant",
+    "blocks.6.attn.proj.weight_fake_quant",
+    "blocks.6.mlp.fc1.weight_fake_quant",
+    "blocks.6.mlp.fc2.weight_fake_quant",
+    "blocks.7.attn.qkv.weight_fake_quant",
+    "blocks.7.attn.proj.weight_fake_quant",
+    "blocks.7.mlp.fc1.weight_fake_quant",
+    "blocks.7.mlp.fc2.weight_fake_quant",
+    "blocks.8.attn.qkv.weight_fake_quant",
+    "blocks.8.attn.proj.weight_fake_quant",
+    "blocks.8.mlp.fc1.weight_fake_quant",
+    "blocks.8.mlp.fc2.weight_fake_quant",
+    "blocks.9.attn.qkv.weight_fake_quant",
+    "blocks.9.attn.proj.weight_fake_quant",
+    "blocks.9.mlp.fc1.weight_fake_quant",
+    "blocks.9.mlp.fc2.weight_fake_quant",
+    "blocks.10.attn.qkv.weight_fake_quant",
+    "blocks.10.attn.proj.weight_fake_quant",
+    "blocks.10.mlp.fc1.weight_fake_quant",
+    "blocks.10.mlp.fc2.weight_fake_quant",
+    "blocks.11.attn.qkv.weight_fake_quant",
+    "blocks.11.attn.proj.weight_fake_quant",
+    "blocks.11.mlp.fc1.weight_fake_quant",
+    "blocks.11.mlp.fc2.weight_fake_quant"
+  ],
+  "restricted_to_recovered_soft": false,
+  "efrap_stats": {
+    "optimized_targets": [
+      "head",
+      "blocks_11_drop_path2",
+      "blocks_11_mlp_norm_post_act_fake_quantizer",
+      "blocks_11_drop_path1",
+      "matmul_22",
+      "blocks_10_drop_path2",
+      "blocks_10_mlp_norm_post_act_fake_quantizer",
+      "blocks_10_drop_path1",
+      "matmul_20",
+      "blocks_9_drop_path2",
+      "blocks_9_mlp_norm_post_act_fake_quantizer",
+      "blocks_9_drop_path1"
+    ],
+    "subgraphs": [
+      {
+        "layer_summaries": [
+          {
+            "name": "head",
+            "type": "Linear",
+            "shape": [
+              1000,
+              768
+            ],
+            "flip_ratio": 0.40014582872390747,
+            "error_mean": 0.00012433725351002067
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.11.mlp.fc2",
+            "type": "Linear",
+            "shape": [
+              768,
+              3072
+            ],
+            "flip_ratio": 0.271087646484375,
+            "error_mean": 0.002555577550083399
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.11.mlp.fc1",
+            "type": "Linear",
+            "shape": [
+              3072,
+              768
+            ],
+            "flip_ratio": 0.4066980183124542,
+            "error_mean": 0.0026379649061709642
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.11.attn.proj",
+            "type": "Linear",
+            "shape": [
+              768,
+              768
+            ],
+            "flip_ratio": 0.2247873991727829,
+            "error_mean": 0.0024358928203582764
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.11.attn.qkv",
+            "type": "Linear",
+            "shape": [
+              2304,
+              768
+            ],
+            "flip_ratio": 0.15542207658290863,
+            "error_mean": 0.0023186993785202503
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.10.mlp.fc2",
+            "type": "Linear",
+            "shape": [
+              768,
+              3072
+            ],
+            "flip_ratio": 0.4466874897480011,
+            "error_mean": 0.003033665707334876
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.10.mlp.fc1",
+            "type": "Linear",
+            "shape": [
+              3072,
+              768
+            ],
+            "flip_ratio": 0.43570244312286377,
+            "error_mean": 0.002427946776151657
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.10.attn.proj",
+            "type": "Linear",
+            "shape": [
+              768,
+              768
+            ],
+            "flip_ratio": 0.3354966938495636,
+            "error_mean": 0.0022239137906581163
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.10.attn.qkv",
+            "type": "Linear",
+            "shape": [
+              2304,
+              768
+            ],
+            "flip_ratio": 0.1057722344994545,
+            "error_mean": 0.0022186615969985723
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.9.mlp.fc2",
+            "type": "Linear",
+            "shape": [
+              768,
+              3072
+            ],
+            "flip_ratio": 0.3312009274959564,
+            "error_mean": 0.0025289624463766813
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.9.mlp.fc1",
+            "type": "Linear",
+            "shape": [
+              3072,
+              768
+            ],
+            "flip_ratio": 0.2539503276348114,
+            "error_mean": 0.0020454812329262495
+          }
+        ]
+      },
+      {
+        "layer_summaries": [
+          {
+            "name": "blocks.9.attn.proj",
+            "type": "Linear",
+            "shape": [
+              768,
+              768
+            ],
+            "flip_ratio": 0.2481028288602829,
+            "error_mean": 0.0020757780876010656
+          }
+        ]
+      }
+    ]
+  },
+  "checkpoint": "/home/kaixin/yisong/demo/outputs/efrap_vit/w4a8_soft_fullchain_eval512_l12c100_gpu0_c64_e512_l12c100/w4a8_soft_fullchain_eval512_l12c100_gpu0_c64_e512_l12c100.pth",
+  "defended_in_memory_clean_top1": 0.01953125,
+  "defended_in_memory_trigger_asr": 1.0,
+  "defended_reloaded_clean_top1": 0.78515625,
+  "defended_reloaded_trigger_asr": 0.0,
+  "exported_checkpoint_type": "deploy_hard_quantized",
+  "stripped_alpha_key_count": 50
+}

@@ -45,7 +45,11 @@ def node2modules(name2modules, nodes):
 def qnode2fpnode(quant_modules, fp32_modules):
     quant_named_nodes = {node.target: node for node in quant_modules}
     fp32_named_nodes = {node.target: node for node in fp32_modules}
-    qnode2fpnode_dict = {quant_named_nodes[key]: fp32_named_nodes[key] for key in quant_named_nodes}
+    qnode2fpnode_dict = {
+        quant_named_nodes[key]: fp32_named_nodes[key]
+        for key in quant_named_nodes
+        if key in fp32_named_nodes
+    }
     return qnode2fpnode_dict
 
 
@@ -92,6 +96,56 @@ def tensor_detach(data):
         data = [tensor_detach(dat) for dat in data]
     else:
         return data
+
+
+def _forward_model(model, batch, device):
+    if isinstance(batch, dict):
+        return model(**to_device(batch, device))
+    return model(to_device(batch, device))
+
+
+class _NodeRecorder(fx.Interpreter):
+    def __init__(self, module: GraphModule, target_names):
+        super().__init__(module)
+        self.target_names = set(target_names)
+        self.records = {}
+
+    def run_node(self, n):
+        result = super().run_node(n)
+        if n.name in self.target_names:
+            self.records[n.name] = tensor_detach(result)
+        return result
+
+
+def save_nodes_data(model: GraphModule, target_nodes, cali_data: list, keep_gpu: bool = True):
+    device = next(model.parameters()).device
+    target_names = [node.name for node in target_nodes]
+    cached = {name: [] for name in target_names}
+    placeholder_names = [node.target for node in model.graph.nodes if node.op == "placeholder"]
+
+    with torch.no_grad():
+        for batch in cali_data:
+            recorder = _NodeRecorder(model, target_names)
+            if isinstance(batch, dict):
+                batch = to_device(batch, device)
+                values = [batch.get(name, None) for name in placeholder_names]
+            else:
+                batch = to_device(batch, device)
+                if isinstance(batch, (list, tuple)):
+                    values = list(batch)
+                else:
+                    values = [batch]
+                if len(values) < len(placeholder_names):
+                    values.extend([None] * (len(placeholder_names) - len(values)))
+            recorder.run(*values)
+            for name in target_names:
+                value = recorder.records[name]
+                if keep_gpu:
+                    cached[name].append(value)
+                else:
+                    cached[name].append(to_device(value, "cpu"))
+
+    return cached
 
 
 def save_inp_oup_data(model: GraphModule, inp_module: Module, oup_module: Module, cali_data: list, store_inp=True, store_oup=True,
@@ -462,12 +516,21 @@ def subgraph_reconstruction(subgraph, cached_inps, cached_oups, cached_inps_bd, 
 
     w_scale = []
     layer_list = []
+    reuse_loaded_alpha = bool(getattr(config, 'reuse_loaded_alpha', False))
+    preserve_adaround_state = bool(getattr(config, 'preserve_adaround_state', False))
     for name, layer in subgraph.named_modules():
         if isinstance(layer, _ADAROUND_SUPPORT_TYPE):
             layer_list.append(layer)
             weight_quantizer = layer.weight_fake_quant
-            # assert isinstance(weight_quantizer, adaround_quantizer) is True
-            weight_quantizer.init(layer.weight.data, config.round_mode)
+            if reuse_loaded_alpha and getattr(weight_quantizer, 'adaround', False) and hasattr(weight_quantizer, 'alpha'):
+                weight_quantizer.observer_enabled[0] = 0
+                weight_quantizer.fake_quant_enabled[0] = 1
+                weight_quantizer.round_mode = getattr(weight_quantizer, 'round_mode', config.round_mode)
+                weight_quantizer.gamma = getattr(weight_quantizer, 'gamma', 0.0)
+                weight_quantizer.zeta = getattr(weight_quantizer, 'zeta', 1.0)
+            else:
+                # assert isinstance(weight_quantizer, adaround_quantizer) is True
+                weight_quantizer.init(layer.weight.data, config.round_mode)
             w_para += [weight_quantizer.alpha]
 
             if weight_quantizer.ch_axis != -1:
@@ -682,21 +745,20 @@ def subgraph_reconstruction(subgraph, cached_inps, cached_oups, cached_inps_bd, 
 
 
     for name, layer in subgraph.named_modules():        
-        if isinstance(layer, _FUSED_TYPE):
-            # We need to do bn fold simulation here.
-            weight_quantizer = layer.weight_fake_quant
-            scale_factor = layer.bn.weight / torch.sqrt(layer.bn.running_var + layer.bn.eps)
-            merged_rounded_weight = weight_quantizer.get_hard_value(
-                layer.weight.data * scale_factor.reshape([-1] + [1] * (len(layer.weight.shape) - 1)))
-            layer.weight.data = merged_rounded_weight / scale_factor.reshape([-1] + [1] * (len(merged_rounded_weight.shape) - 1))
-            weight_quantizer.adaround = False
-        elif isinstance(layer, _ADAROUND_SUPPORT_TYPE):
-            assert not hasattr(layer, 'bn'), 'Layer {} with type {} has BN ! Should not reach here.'.format(name, type(layer))
-            weight_quantizer = layer.weight_fake_quant
-           
-            
-            layer.weight.data = weight_quantizer.get_hard_value(layer.weight.data)
-            weight_quantizer.adaround = False
+        if not preserve_adaround_state:
+            if isinstance(layer, _FUSED_TYPE):
+                # We need to do bn fold simulation here.
+                weight_quantizer = layer.weight_fake_quant
+                scale_factor = layer.bn.weight / torch.sqrt(layer.bn.running_var + layer.bn.eps)
+                merged_rounded_weight = weight_quantizer.get_hard_value(
+                    layer.weight.data * scale_factor.reshape([-1] + [1] * (len(layer.weight.shape) - 1)))
+                layer.weight.data = merged_rounded_weight / scale_factor.reshape([-1] + [1] * (len(merged_rounded_weight.shape) - 1))
+                weight_quantizer.adaround = False
+            elif isinstance(layer, _ADAROUND_SUPPORT_TYPE):
+                assert not hasattr(layer, 'bn'), 'Layer {} with type {} has BN ! Should not reach here.'.format(name, type(layer))
+                weight_quantizer = layer.weight_fake_quant
+                layer.weight.data = weight_quantizer.get_hard_value(layer.weight.data)
+                weight_quantizer.adaround = False
         if isinstance(layer, torch.quantization.FakeQuantizeBase) and 'post_act_fake_quantize' in name:
             layer.prob = 1.0   # recover to promise that drop activation quantization only occurs at reconstruction phase
 
@@ -1012,6 +1074,7 @@ def ptq_reconstruction(model: GraphModule, cali_data: list, cali_data_bd: list, 
         g2node = getitem2node(quant_model)
         fp32_modules = node2modules(dict(fp32_model.named_modules()), fp32_model.graph.nodes)
         quant_modules = node2modules(dict(quant_model.named_modules()), quant_model.graph.nodes)
+        fp32_nodes_by_name = {node.name: node for node in fp32_model.graph.nodes}
         topology_order_by_node = topology_order(quant_model)
     else:
         quant_model = deepcopy_mixedmodule(model, graph_module_list)
@@ -1019,6 +1082,7 @@ def ptq_reconstruction(model: GraphModule, cali_data: list, cali_data_bd: list, 
         g2node = dict()
         fp32_modules = dict()
         quant_modules = dict()
+        fp32_nodes_by_name = dict()
         topology_order_by_node = {}
         topo_cnt = 0
         for mname in graph_module_list:
@@ -1034,6 +1098,7 @@ def ptq_reconstruction(model: GraphModule, cali_data: list, cali_data_bd: list, 
             q_modules = node2modules(dict(q_child.named_modules()), q_child.graph.nodes)
             fp32_modules.update(fp_modules)
             quant_modules.update(q_modules)
+            fp32_nodes_by_name.update({node.name: node for node in fp_child.graph.nodes})
             child_topo = topology_order(q_child)
             for k in child_topo:
                 child_topo[k] += topo_cnt
@@ -1137,60 +1202,63 @@ def ptq_reconstruction(model: GraphModule, cali_data: list, cali_data_bd: list, 
                 continue
             logger.info('the node list is below!')
             logger.info(layer_node_list)
-            if model_type == "VisionTransformer":
-                if any(node not in qnode2fpnode_dict for node in layer_node_list):
-                    print("有一个或多个节点不在 qnode2fpnode_dict 中，跳过当前循环")
-                    continue
-
-            try:
-                fp32_module = fp32_modules[qnode2fpnode_dict[layer_node_list[-1]]]
-            except KeyError as e:
-                print(f"Key not found: {e}")
+            target_node = layer_node_list[-1]
+            fp32_target_node = fp32_nodes_by_name.get(target_node.name)
+            if fp32_target_node is None:
+                logger.warning('Skip node %s because the fp32 node mapping is missing.', target_node)
                 continue
-            # fp32_module = fp32_modules[qnode2fpnode_dict[layer_node_list[-1]]]
-            fp32_all_inps = []
-            quant_all_inps = []
-            fp32_all_inps_bd = []
-            quant_all_inps_bd = []
-            fp32_final_oups = None
-            out_is_cached = False
+
+            fp32_input_nodes = []
+            input_nodes = []
             for _node in layer_node_list:
                 if all([arg in layer_node_list for arg in _flatten_args(_node.args) if isinstance(arg, torch.fx.Node)]):
                     continue
-                else:
-                    fp32_inp_module = fp32_modules[qnode2fpnode_dict[_node]]
-                    quant_module = quant_modules[_node]
-                    # fp32 inps: [out_b1, out_b2, ...]
-                    _, fp32_inps = save_inp_oup_data(fp32_model, None, fp32_inp_module, cali_data, 
-                                                     store_inp=False, store_oup=(config.prob < 1.0), keep_gpu=config.keep_gpu)
-                    _, fp32_oups = save_inp_oup_data(fp32_model, None, fp32_module, cali_data,
-                                                     store_inp=False, store_oup=(not out_is_cached), keep_gpu=config.keep_gpu)
-                    _, quant_inps = save_inp_oup_data(quant_model, None, quant_module, cali_data,
-                                                      store_inp=False, store_oup=True, keep_gpu=config.keep_gpu)
-                    
-                    _, fp32_inps_bd = save_inp_oup_data(fp32_model, None, fp32_inp_module, cali_data_bd, 
-                                                    store_inp=False, store_oup=(config.prob < 1.0), keep_gpu=config.keep_gpu)
-                    _, quant_inps_bd = save_inp_oup_data(quant_model, None, quant_module, cali_data_bd,
-                                                    store_inp=False, store_oup=True, keep_gpu=config.keep_gpu)
+                fp32_sub_node = fp32_nodes_by_name.get(_node.name)
+                if fp32_sub_node is None:
+                    logger.warning('Skip input node %s because the fp32 node mapping is missing.', _node)
+                    continue
+                fp32_input_nodes.append(fp32_sub_node)
+                input_nodes.append(_node)
 
-                    fp32_all_inps.append(fp32_inps)
-                    quant_all_inps.append(quant_inps)
-                    fp32_all_inps_bd.append(fp32_inps_bd)
-                    quant_all_inps_bd.append(quant_inps_bd)
-                    if not out_is_cached:
-                        fp32_final_oups = fp32_oups
-                        out_is_cached = True
+            if not input_nodes:
+                logger.warning('Skip node %s because cache building failed.', node)
+                continue
+
+            fp32_recorded = save_nodes_data(
+                fp32_model,
+                fp32_input_nodes + [fp32_target_node],
+                cali_data,
+                keep_gpu=config.keep_gpu,
+            )
+            fp32_trigger_recorded = save_nodes_data(
+                fp32_model,
+                fp32_input_nodes + [fp32_target_node],
+                cali_data_bd,
+                keep_gpu=config.keep_gpu,
+            )
+            quant_recorded = save_nodes_data(
+                quant_model,
+                input_nodes,
+                cali_data,
+                keep_gpu=config.keep_gpu,
+            )
+            trigger_recorded = save_nodes_data(
+                quant_model,
+                input_nodes,
+                cali_data_bd,
+                keep_gpu=config.keep_gpu,
+            )
+
+            fp32_all_inps = [fp32_recorded[_node.name] for _node in fp32_input_nodes]
+            quant_all_inps = [quant_recorded[_node.name] for _node in input_nodes]
+            fp32_all_inps_bd = [fp32_trigger_recorded[_node.name] for _node in fp32_input_nodes]
+            quant_all_inps_bd = [trigger_recorded[_node.name] for _node in input_nodes]
             cached_inps = (quant_all_inps, fp32_all_inps) if config.prob < 1.0 else quant_all_inps
             cached_inps_bd = (quant_all_inps_bd, fp32_all_inps_bd) if config.prob < 1.0 else quant_all_inps_bd
-            cached_oups = fp32_final_oups
+            cached_oups = fp32_recorded[fp32_target_node.name]
 
-            quant_modules_by_name = dict()
-            for node in layer_node_list:
-                if node.op == 'call_module':
-                    quant_modules_by_name[node.target] = quant_modules[node]
-            
-            subgraph = extract_subgraph(quant_modules_by_name, layer_node_list,
-                                        layer_node_list[-1], g2node)
+            subgraph = extract_subgraph(quant_model, layer_node_list,
+                                        target_node, g2node)
             logger.info(subgraph.code)
 
             # TODO add save_inp_oup_data_bd func and use the grad of the last layer to guide the training
@@ -1211,7 +1279,7 @@ def ptq_reconstruction(model: GraphModule, cali_data: list, cali_data_bd: list, 
                             if node.op == 'call_module':
                                 remain_quant_modules_by_name[node.target] = quant_modules[node]
 
-                        remain_subgraph = extract_subgraph(remain_quant_modules_by_name, remain_node_list, 
+                        remain_subgraph = extract_subgraph(quant_model, remain_node_list, 
                                                         remain_node_list[-1], g2node)
 
                         # remain_subgraph = extract_remain_subgraph(remain_quant_modules_by_name, remain_node_list[0], remain_node_list[-1])

@@ -38,7 +38,7 @@ def main():
     log_file = LOG_DIR / f"vit_base_imagenet_bd_w8a8_t{args.bd_target}.log"
 
     cmd = [
-        sys.executable, "main.py",
+        sys.executable, "-u", "main.py",
         "--config", CONFIG,
         "--model", "vit_base",
         "--dataset", "imagenet",
@@ -64,7 +64,9 @@ def main():
     print()
 
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(QURA_DIR.parent.parent.parent.parent)  # repo root
+    # Keep vendored QURA importable without letting /demo/datasets shadow
+    # the HuggingFace datasets package.
+    env["PYTHONPATH"] = str(QURA_DIR.parent.parent)
 
     with open(log_file, "w") as fout:
         proc = subprocess.Popen(

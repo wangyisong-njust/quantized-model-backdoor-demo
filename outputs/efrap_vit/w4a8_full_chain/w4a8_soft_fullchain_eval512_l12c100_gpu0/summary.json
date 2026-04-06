@@ -1,0 +1,18 @@
+{
+  "tag": "w4a8_soft_fullchain_eval512_l12c100_gpu0",
+  "attack_config": "/home/kaixin/yisong/demo/configs/attack/vit_base_imagenet_w4a8_qura.yaml",
+  "quant_model": "/home/kaixin/yisong/demo/third_party/qura/ours/main/model/vit_base+imagenet.quant_bd_w4a8_t0_fixedpos_soft.pth",
+  "defense_metrics": "/home/kaixin/yisong/demo/outputs/efrap_vit/w4a8_soft_fullchain_eval512_l12c100_gpu0_c64_e512_l12c100/metrics.json",
+  "fp32_clean_top1": 0.81640625,
+  "fp32_trigger_asr": 0.005859375,
+  "baseline_clean_top1": 0.724609375,
+  "baseline_trigger_asr": 0.927734375,
+  "defended_clean_top1": 0.78515625,
+  "defended_trigger_asr": 0.0,
+  "clean_top1_delta": 0.060546875,
+  "trigger_asr_delta": -0.927734375,
+  "optimized_target_count": 12,
+  "recovered_soft_layers": 0,
+  "restricted_to_recovered_soft": false,
+  "exported_checkpoint_type": "deploy_hard_quantized"
+}
